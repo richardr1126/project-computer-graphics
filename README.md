@@ -69,10 +69,8 @@ zip -r project.zip .
 
 ## How to run
 
-From the `project/` folder:
-
 ```
-make        # builds both 'project' and 'builder'
+make        # builds the project
 ./project   # launch the full scene
 ```
 

@@ -1,14 +1,19 @@
 # project
 EXE=project
+OBJDIR=build
 
 # Main target
-all: $(EXE)
+all: $(OBJDIR) $(EXE)
+
+# Create build directory
+$(OBJDIR):
+	mkdir -p $(OBJDIR)
 
 #  Msys/MinGW
 ifeq "$(OS)" "Windows_NT"
 CFLG=-O3 -Wall -DUSEGLEW
 LIBS=-lfreeglut -lglew32 -lglu32 -lopengl32 -lm
-CLEAN=rm -f *.exe *.o *.a
+CLEAN=rm -f *.exe *.o *.a && rm -rf $(OBJDIR)
 else
 #  OSX
 ifeq "$(shell uname)" "Darwin"
@@ -20,30 +25,39 @@ CFLG=-O3 -Wall
 LIBS=-lglut -lGLU -lGL -lm
 endif
 #  OSX/Linux/Unix/Solaris
-CLEAN=rm -f $(EXE) *.o *.a
+CLEAN=rm -f $(EXE) *.a && rm -rf $(OBJDIR)
 endif
 
 # Compile rules
 .c.o:
-	gcc -c $(CFLG)  $<
+	gcc -c $(CFLG)  $< -o $(OBJDIR)/$@
 .cpp.o:
-	g++ -c $(CFLG)  $<
+	g++ -c $(CFLG)  $< -o $(OBJDIR)/$@
 
 #  Link
-project: main.o bullseye.o ground.o lighting.o axes.o view.o utils.o
+project: $(OBJDIR)/main.o $(OBJDIR)/bullseye.o $(OBJDIR)/ground.o $(OBJDIR)/lighting.o $(OBJDIR)/axes.o $(OBJDIR)/view.o $(OBJDIR)/utils.o
 	gcc $(CFLG) -o $@ $^  $(LIBS)
 
 # Compile objects directory
-bullseye.o: objects/bullseye.c
+$(OBJDIR)/bullseye.o: objects/bullseye.c | $(OBJDIR)
 	gcc -c $(CFLG) -o $@ $<
 
-ground.o: objects/ground.c
+$(OBJDIR)/ground.o: objects/ground.c | $(OBJDIR)
 	gcc -c $(CFLG) -o $@ $<
 
-lighting.o: objects/lighting.c
+$(OBJDIR)/lighting.o: objects/lighting.c | $(OBJDIR)
 	gcc -c $(CFLG) -o $@ $<
 
-axes.o: objects/axes.c
+$(OBJDIR)/axes.o: objects/axes.c | $(OBJDIR)
+	gcc -c $(CFLG) -o $@ $<
+
+$(OBJDIR)/view.o: view.c | $(OBJDIR)
+	gcc -c $(CFLG) -o $@ $<
+
+$(OBJDIR)/utils.o: utils.c | $(OBJDIR)
+	gcc -c $(CFLG) -o $@ $<
+
+$(OBJDIR)/main.o: main.c | $(OBJDIR)
 	gcc -c $(CFLG) -o $@ $<
 
 #  Clean
