@@ -94,8 +94,9 @@ unsigned int LoadTexBMP(const char* file)
    if (dx<1 || dx>max) Fatal("%s image width %d out of range 1-%d\n",file,dx,max);
    if (dy<1 || dy>max) Fatal("%s image height %d out of range 1-%d\n",file,dy,max);
    if (nbp!=1)  Fatal("%s bit planes is not 1: %d\n",file,nbp);
-   if (bpp!=24) Fatal("%s bits per pixel is not 24: %d\n",file,bpp);
-   if (k!=0)    Fatal("%s compressed files not supported\n",file);
+   if (bpp!=24 && bpp!=32) Fatal("%s bits per pixel is not 24 or 32: %d\n",file,bpp);
+   //  32-bit BMPs often use BI_BITFIELDS (k=3) which is acceptable for RGBA
+   if (k!=0 && !(bpp==32 && k==3)) Fatal("%s compressed files not supported (compression=%d)\n",file,k);
 #ifndef GL_VERSION_2_0
    //  OpenGL 2.0 lifts the restriction that texture size must be a power of two
    for (k=1;k<dx;k*=2);
@@ -104,15 +105,20 @@ unsigned int LoadTexBMP(const char* file)
    if (k!=dy) Fatal("%s image height not a power of two: %d\n",file,dy);
 #endif
 
+   //  Determine bytes per pixel
+   int bytesPerPixel = bpp / 8;
+   int hasAlpha = (bpp == 32);
+   
    //  Allocate image memory
-   unsigned int size = 3*dx*dy;
+   unsigned int size = bytesPerPixel * dx * dy;
    unsigned char* image = (unsigned char*) malloc(size);
    if (!image) Fatal("Cannot allocate %d bytes of memory for image %s\n",size,file);
    //  Seek to and read image
    if (fseek(f,off,SEEK_SET) || fread(image,size,1,f)!=1) Fatal("Error reading data from image %s\n",file);
    fclose(f);
-   //  Reverse colors (BGR -> RGB)
-   for (k=0;k<size;k+=3)
+   
+   //  Reverse colors (BGR -> RGB or BGRA -> RGBA)
+   for (k=0;k<size;k+=bytesPerPixel)
    {
       unsigned char temp = image[k];
       image[k]   = image[k+2];
@@ -126,11 +132,27 @@ unsigned int LoadTexBMP(const char* file)
    glGenTextures(1,&texture);
    glBindTexture(GL_TEXTURE_2D,texture);
    //  Copy image
-   glTexImage2D(GL_TEXTURE_2D,0,GL_RGB,dx,dy,0,GL_RGB,GL_UNSIGNED_BYTE,image);
-   if (glGetError()) Fatal("Error in glTexImage2D %s %dx%d\n",file,dx,dy);
-   //  Scale linearly when image size doesn't match
+   if (hasAlpha)
+   {
+      gluBuild2DMipmaps(GL_TEXTURE_2D,GL_RGBA,dx,dy,GL_RGBA,GL_UNSIGNED_BYTE,image);
+   }
+   else
+   {
+      gluBuild2DMipmaps(GL_TEXTURE_2D,GL_RGB,dx,dy,GL_RGB,GL_UNSIGNED_BYTE,image);
+   }
+   if (glGetError()) Fatal("Error in gluBuild2DMipmaps %s %dx%d\n",file,dx,dy);
+   //  Use linear filtering for magnification
    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
-   glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
+   //  Use bilinear mipmapping for minification (sharper, eliminates graininess)
+   glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR_MIPMAP_NEAREST);
+   
+   //  Enable anisotropic filtering if available (reduces blur at oblique angles)
+   if (strstr((const char*)glGetString(GL_EXTENSIONS), "GL_EXT_texture_filter_anisotropic"))
+   {
+      GLfloat maxAniso;
+      glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &maxAniso);
+      glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, maxAniso);
+   }
 
    //  Free image memory
    free(image);

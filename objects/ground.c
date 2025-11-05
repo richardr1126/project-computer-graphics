@@ -66,97 +66,126 @@ static void terrainNormal(double x, double z, double steepness, double* nx, doub
 
 /*
  *  Draw ground terrain with varied height
+ *  Optimized: caches a display list for the static mesh to avoid per-frame recomputation
  */
 void drawGround(double steepness, double size, double groundY, unsigned int texture, int showNormals)
 {
     const double step = 0.5;  // Grid resolution
-    
-    // Set material properties for ground - minimal specular to avoid stretching artifacts
-    float groundSpecular[] = {0.05, 0.05, 0.05, 1.0}; // Very low specular
-    glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, groundSpecular);
-    glMaterialf(GL_FRONT_AND_BACK, GL_SHININESS, 2.0); // Low shininess for matte surface
-    
-    // Enable texturing if texture provided
-    if (texture)
+    const double texScale = 0.2; // Texture coordinate scale
+
+    static GLuint groundList = 0;
+    static double cachedSteep = 0.0, cachedSize = 0.0, cachedY = 0.0;
+    static unsigned int cachedTex = 0;
+
+    int needsRebuild = 0;
+    if (!groundList) needsRebuild = 1;
+    if (cachedSteep != steepness || cachedSize != size || cachedY != groundY || cachedTex != texture)
+        needsRebuild = 1;
+
+    if (needsRebuild)
     {
-        glEnable(GL_TEXTURE_2D);
-        glBindTexture(GL_TEXTURE_2D, texture);
-        glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
-        glColor3f(1.0, 1.0, 1.0); // White to show true texture colors
-    }
-    else
-    {
-        glColor3f(0.3, 0.5, 0.2); // Green-ish ground color
-    }
-    
-    // Texture coordinate scale (how many times texture repeats across ground)
-    const double texScale = 0.1;
-    
-    // Draw individual quads for proper normal calculation per vertex
-    glBegin(GL_QUADS);
-    for (double x = -size; x < size; x += step)
-    {
-        for (double z = -size; z < size; z += step)
+        if (groundList) glDeleteLists(groundList, 1);
+        groundList = glGenLists(1);
+
+        // Precompute heights and normals at grid vertices
+        int nx = (int)floor((2.0*size)/step) + 1;
+        int nz = (int)floor((2.0*size)/step) + 1;
+        int total = nx * nz;
+        double* H = (double*)malloc(sizeof(double)*total);
+        double* NX = (double*)malloc(sizeof(double)*total);
+        double* NY = (double*)malloc(sizeof(double)*total);
+        double* NZ = (double*)malloc(sizeof(double)*total);
+        if (!H || !NX || !NY || !NZ)
         {
-            // Four corners of the quad with individual normals
-            double h1, h2, h3, h4;
-            double nx1, ny1, nz1;
-            double nx2, ny2, nz2;
-            double nx3, ny3, nz3;
-            double nx4, ny4, nz4;
-            
-            // Bottom-left corner (x, z)
-            h1 = terrainHeight(x, z, steepness);
-            terrainNormal(x, z, steepness, &nx1, &ny1, &nz1);
-            glNormal3d(nx1, ny1, nz1);
-            if (texture) glTexCoord2d(x * texScale, z * texScale);
-            glVertex3d(x, groundY + h1, z);
-            
-            // Bottom-right corner (x+step, z)
-            h2 = terrainHeight(x + step, z, steepness);
-            terrainNormal(x + step, z, steepness, &nx2, &ny2, &nz2);
-            glNormal3d(nx2, ny2, nz2);
-            if (texture) glTexCoord2d((x + step) * texScale, z * texScale);
-            glVertex3d(x + step, groundY + h2, z);
-            
-            // Top-right corner (x+step, z+step)
-            h3 = terrainHeight(x + step, z + step, steepness);
-            terrainNormal(x + step, z + step, steepness, &nx3, &ny3, &nz3);
-            glNormal3d(nx3, ny3, nz3);
-            if (texture) glTexCoord2d((x + step) * texScale, (z + step) * texScale);
-            glVertex3d(x + step, groundY + h3, z + step);
-            
-            // Top-left corner (x, z+step)
-            h4 = terrainHeight(x, z + step, steepness);
-            terrainNormal(x, z + step, steepness, &nx4, &ny4, &nz4);
-            glNormal3d(nx4, ny4, nz4);
-            if (texture) glTexCoord2d(x * texScale, (z + step) * texScale);
-            glVertex3d(x, groundY + h4, z + step);
+            free(H); free(NX); free(NY); free(NZ);
+            // Fallback to immediate path if allocation fails
         }
+
+        double x0 = -size;
+        double z0 = -size;
+        for (int iz=0; iz<nz; ++iz)
+        {
+            double z = z0 + iz*step;
+            for (int ix=0; ix<nx; ++ix)
+            {
+                double x = x0 + ix*step;
+                int idx = iz*nx + ix;
+                H[idx] = terrainHeight(x, z, steepness);
+                double nxv, nyv, nzv;
+                terrainNormal(x, z, steepness, &nxv, &nyv, &nzv);
+                NX[idx] = nxv; NY[idx] = nyv; NZ[idx] = nzv;
+            }
+        }
+
+        glNewList(groundList, GL_COMPILE);
+        // Set material properties for ground - minimal specular to avoid stretching artifacts
+        float groundSpecular[] = {0.05f, 0.05f, 0.05f, 1.0f};
+        glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, groundSpecular);
+        glMaterialf(GL_FRONT_AND_BACK, GL_SHININESS, 2.0f);
+
+        if (texture)
+        {
+            glEnable(GL_TEXTURE_2D);
+            glBindTexture(GL_TEXTURE_2D, texture);
+            glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+            glColor3f(1.0f, 1.0f, 1.0f);
+        }
+        else
+        {
+            glColor3f(0.3f, 0.5f, 0.2f);
+        }
+
+        // Render as triangle strips per row for fewer vertices submitted
+        for (int iz=0; iz<nz-1; ++iz)
+        {
+            double zA = z0 + iz*step;
+            double zB = z0 + (iz+1)*step;
+            glBegin(GL_TRIANGLE_STRIP);
+            for (int ix=0; ix<nx; ++ix)
+            {
+                double x = x0 + ix*step;
+                int iA = iz*nx + ix;
+                int iB = (iz+1)*nx + ix;
+
+                glNormal3d(NX[iB], NY[iB], NZ[iB]);
+                if (texture) glTexCoord2d(x * texScale, zB * texScale);
+                glVertex3d(x, groundY + H[iB], zB);
+
+                glNormal3d(NX[iA], NY[iA], NZ[iA]);
+                if (texture) glTexCoord2d(x * texScale, zA * texScale);
+                glVertex3d(x, groundY + H[iA], zA);
+            }
+            glEnd();
+        }
+
+        if (texture) glDisable(GL_TEXTURE_2D);
+
+        // Restore default specular
+        float white[] = {1.0f, 1.0f, 1.0f, 1.0f};
+        glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, white);
+        glMaterialf(GL_FRONT_AND_BACK, GL_SHININESS, 32.0f);
+        glEndList();
+
+        // Cache params used
+        cachedSteep = steepness; cachedSize = size; cachedY = groundY; cachedTex = texture;
+
+        free(H); free(NX); free(NY); free(NZ);
     }
-    glEnd();
-    
-    // Disable texturing after drawing
-    if (texture)
-    {
-        glDisable(GL_TEXTURE_2D);
-    }
-    
-    // Restore default specular material properties
-    float white[] = {1.0, 1.0, 1.0, 1.0};
-    glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, white);
-    glMaterialf(GL_FRONT_AND_BACK, GL_SHININESS, 32.0);
-    
-    // Draw normals if requested
+
+    // Call the cached list
+    if (groundList)
+        glCallList(groundList);
+
+    // Draw normals if requested (dynamic, not in the list)
     if (showNormals)
     {
         GLboolean wasLit = glIsEnabled(GL_LIGHTING);
         if (wasLit) glDisable(GL_LIGHTING);
-        
-        glColor3f(1.0, 1.0, 0.0); // Yellow normals
+
+        glColor3f(1.0f, 1.0f, 0.0f);
         const double normalLen = 0.3;
-        const double normalStep = 1.0; // Sparse normals for visibility
-        
+        const double normalStep = 1.0;
+
         glBegin(GL_LINES);
         for (double x = -size; x <= size; x += normalStep)
         {
@@ -165,13 +194,13 @@ void drawGround(double steepness, double size, double groundY, unsigned int text
                 double h = terrainHeight(x, z, steepness);
                 double nx, ny, nz;
                 terrainNormal(x, z, steepness, &nx, &ny, &nz);
-                
+
                 glVertex3d(x, groundY + h, z);
                 glVertex3d(x + nx * normalLen, groundY + h + ny * normalLen, z + nz * normalLen);
             }
         }
         glEnd();
-        
+
         if (wasLit) glEnable(GL_LIGHTING);
     }
 }

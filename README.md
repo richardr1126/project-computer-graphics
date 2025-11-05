@@ -13,6 +13,7 @@ Implements texture mapping on a 3D scene with lighting. Features a textured terr
   - **Normals Debugging**: Toggle display of normals for all objects.
 - **Objects**:
   - **Ground**: Textured ground terrain with height variations.
+  - **Trees**: Procedurally generated trees with textured trunks and alpha-blended leaves.
   - **Bullseyes**: Three textured bullseye targets with animated motion.
   - **Light Sphere**: Represents the light source in the scene.
 
@@ -69,9 +70,24 @@ make        # builds the project
 ./project   # launch the full scene
 ```
 
+## Performance Optimizations
+
+- Trunks vs Leaves Split: Scene renders in two passes — opaque trunks/branches first, then transparent leaves. The leaf pass traverses the same hierarchy but emits leaves only (no duplicate trunk geometry), cutting CPU draw calls and overdraw.
+- Leaves-Only Path: A `leavesOnly` render mode reuses identical transforms so leaf placement matches the opaque pass exactly, but skips all `glBegin/glEnd` for frustums and normals.
+- Culling for Trunks/Branches: Back-face culling is enabled only for the opaque tree pass (both trunk and branch frustums) and set to clockwise front faces during that pass (`glFrontFace(GL_CW)`), then restored. This halves fragment work on the bark geometry without affecting leaves.
+- Alpha Test for Leaves: Alpha testing is enabled during the leaf pass (`glAlphaFunc(GL_GREATER, 0.1f)`), discarding fully transparent texels to reduce blending overdraw.
+- Reduced State Churn: Leaf texture is bound once for the entire transparent pass; per-leaf `glEnable(GL_TEXTURE_2D)`/`glBindTexture` calls were removed. Per-frustum texture parameter changes were removed from hot loops.
+- Disabled GL_NORMALIZE: Normals are pre-normalized for trunks/ground, and lighting is off for the light sphere’s scale. Disabling `GL_NORMALIZE` removes per-vertex renormalization overhead.
+- Shared Forest Iterator: Both passes use a shared internal helper to iterate tree rings, avoiding duplicate RNG/setup and keeping placement perfectly consistent across passes.
+- Ground Display List + Strips: The terrain mesh is precomputed once (heights + normals) and cached in an OpenGL display list rendered as row-wise `GL_TRIANGLE_STRIP`s. This eliminates per-frame height/normal recomputation and slashes immediate-mode submissions. The list rebuilds only if `steepness`, `size`, `groundY`, or the ground texture changes.
+- Swap-Only Present: Removed an explicit `glFlush()` before buffer swap; rely on `glutSwapBuffers()` which flushes implicitly, reducing driver overhead slightly.
+- Anisotropic Filtering (if available): Texture loader enables the maximum supported anisotropy via `GL_EXT_texture_filter_anisotropic` for sharper textures at grazing angles.
+
 ## Texture credits
 
 <p class="attribution">"<a rel="noopener noreferrer" href="https://www.flickr.com/photos/25797459@N06/22325917510">free seamless texture autumn leaves 2</a>" by <a rel="noopener noreferrer" href="https://www.flickr.com/photos/25797459@N06">zaphad1</a> is licensed under <a rel="noopener noreferrer" href="https://creativecommons.org/licenses/by/2.0/?ref=openverse">CC BY 2.0 <img src="https://mirrors.creativecommons.org/presskit/icons/cc.svg" style="height: 1em; margin-right: 0.125em; display: inline;" /><img src="https://mirrors.creativecommons.org/presskit/icons/by.svg" style="height: 1em; margin-right: 0.125em; display: inline;" /></a>.</p>
+
+<p class="attribution">"<a rel="noopener noreferrer" href="https://www.flickr.com/photos/93421824@N06/8595032920">Dirt and Rock Redux</a>" by <a rel="noopener noreferrer" href="https://www.flickr.com/photos/93421824@N06">Filter Forge</a> is licensed under <a rel="noopener noreferrer" href="https://creativecommons.org/licenses/by/2.0/?ref=openverse">CC BY 2.0 <img src="https://mirrors.creativecommons.org/presskit/icons/cc.svg" style="height: 1em; margin-right: 0.125em; display: inline;" /><img src="https://mirrors.creativecommons.org/presskit/icons/by.svg" style="height: 1em; margin-right: 0.125em; display: inline;" /></a>.</p>
 
 <p class="attribution">"<a rel="noopener noreferrer" href="https://www.flickr.com/photos/44071822@N08/4727355663">High Quality Tileable Light Wood Texture 1</a>" by <a rel="noopener noreferrer" href="https://www.flickr.com/photos/44071822@N08">webtreats</a> is licensed under <a rel="noopener noreferrer" href="https://creativecommons.org/licenses/by/2.0/?ref=openverse">CC BY 2.0 <img src="https://mirrors.creativecommons.org/presskit/icons/cc.svg" style="height: 1em; margin-right: 0.125em; display: inline;" /><img src="https://mirrors.creativecommons.org/presskit/icons/by.svg" style="height: 1em; margin-right: 0.125em; display: inline;" /></a>.</p>
 

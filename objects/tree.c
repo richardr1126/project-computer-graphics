@@ -15,33 +15,64 @@ static double rand01(unsigned int s)
     return (x & 0xFFFFFFu) / 16777215.0;
 }
 
+/* Apply cylindrical billboarding: rotate to face camera horizontally only */
+static void applyCylindricalBillboard()
+{
+    float modelview[16];
+    glGetFloatv(GL_MODELVIEW_MATRIX, modelview);
+    
+    /* Zero out X and Z rotation components, preserve Y (up) vector */
+    modelview[0] = 1.0f;  /* Right vector X */
+    modelview[2] = 0.0f;  /* Right vector Z */
+    /* modelview[4,5,6] - Up vector - LEAVE UNCHANGED */
+    modelview[8] = 0.0f;  /* Look vector X */
+    modelview[9] = 0.0f;  /* Look vector Y */
+    modelview[10] = 1.0f; /* Look vector Z */
+    
+    glLoadMatrixf(modelview);
+}
+
+/* Draw a single leaf cluster as a textured quad */
+static void drawLeaf(double size, unsigned int texture)
+{
+    /* Texture is assumed bound/enabled by caller in transparent pass */
+    glColor3f(1, 1, 1);
+    
+    double half = size * 0.5;
+    glBegin(GL_QUADS);
+        glNormal3d(0, 0, 1);
+        glTexCoord2d(0, 0); glVertex3d(-half, -half, 0);
+        glTexCoord2d(1, 0); glVertex3d( half, -half, 0);
+        glTexCoord2d(1, 1); glVertex3d( half,  half, 0);
+        glTexCoord2d(0, 1); glVertex3d(-half,  half, 0);
+    glEnd();
+}
+
 /* Draw a textured tapered frustum (r0 -> r1) along +Y with UV controls */
 static void drawFrustum(double r0, double r1, double length, unsigned int sides, unsigned int texture, double uOffset, double vScale)
 {
-    if (sides < 6) sides = 12;
+    if (sides < 6) sides = 6;
     const double d = 360.0 / (double)sides;
 
     if (texture)
     {
         glEnable(GL_TEXTURE_2D);
         glBindTexture(GL_TEXTURE_2D, texture);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-        glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
         glColor3f(1,1,1);
     }
 
     /* Normal Y component for frustum: k = (r0 - r1)/length */
     const double k = (length > 0.0) ? ((r0 - r1) / length) : 0.0;
+    const double invSqrt = (k != 0.0) ? 1.0 / sqrt(1.0 + k*k) : 1.0;
 
     glBegin(GL_QUAD_STRIP);
     for (double ang = 0; ang <= 360.0001; ang += d)
     {
         double c = Cos(ang), s = Sin(ang);
-        /* outward normal proportional to (c, k, s) */
-        double nx = c, ny = k, nz = s;
-        double nl = sqrt(nx*nx + ny*ny + nz*nz);
-        if (nl > 0) { nx/=nl; ny/=nl; nz/=nl; }
+        /* Pre-normalized outward normal (c, k, s) */
+        double nx = c * invSqrt;
+        double ny = k * invSqrt;
+        double nz = s * invSqrt;
 
         glNormal3d(nx, ny, nz);
         if (texture) glTexCoord2d(uOffset + ang/360.0, vScale);
@@ -81,27 +112,119 @@ static void drawFrustumNormals(double r0, double r1, double length)
     glEnd();
 }
 
+/* Add leaf clusters to branch tips (only for outer branches) */
+static void addLeavesToBranch(int depth, double len, double r, double anim, unsigned int leafTexture, unsigned int seed)
+{
+    if (!leafTexture || depth > 2) return; /* Only add leaves to outer branches */
+    
+    /* Number of leaf clusters based on depth */
+    int numLeaves = (depth == 1) ? (3 + (int)(2.0 * rand01(seed + 300u))) : (2 + (int)(2.0 * rand01(seed + 301u)));
+    
+    for (int i = 0; i < numLeaves; i++)
+    {
+        unsigned int lseed = seed * 97u + (unsigned int)i * 53u;
+        
+        /* Position along branch with some randomness */
+        double t = 0.3 + 0.6 * rand01(lseed + 1u);
+        double yPos = len * t;
+        
+        /* Random offset from branch center */
+        double offsetDist = (r + 0.1) * (0.8 + 0.4 * rand01(lseed + 2u));
+        double offsetAngle = 360.0 * rand01(lseed + 3u);
+        double xOff = offsetDist * Cos(offsetAngle);
+        double zOff = offsetDist * Sin(offsetAngle);
+        
+        /* Leaf size with variation - made slightly smaller */
+        double leafSize = 0.35 + 0.25 * rand01(lseed + 4u);
+        
+        /* Random rotation around Y for variety */
+        double yRot = 360.0 * rand01(lseed + 5u);
+        
+        /* Gentle sway */
+        double sway = 3.0 * Sin(anim + (double)i * 23.0 + (double)depth * 17.0);
+        
+        glPushMatrix();
+            glTranslated(xOff, yPos, zOff);
+            glRotated(yRot + sway, 0, 1, 0);
+            applyCylindricalBillboard();
+            drawLeaf(leafSize, leafTexture);
+        glPopMatrix();
+    }
+}
+
+/* Forward declaration for helper used by drawForest */
+static void drawTreeAt(double x, double z, double anim,
+                       unsigned int barkTexture, unsigned int leafTexture,
+                       int showNormals, unsigned int seed, int leavesOnly);
+
+/* Internal helper: iterate all tree rings and draw each tree */
+static void drawForest(double anim, int showNormals, unsigned int barkTexture, unsigned int leafTexture, int leavesOnly)
+{
+    const double r1 = 15.0;
+    const double r2 = 22.0;
+    const double r3 = 29.0;
+    const double r4 = 36.0;
+
+    int n1 = 4;
+    for (int i=0;i<n1;i++)
+    {
+        unsigned int seed = 12345u + (unsigned int)i*17u;
+        double a = i * (360.0 / n1) + (25.0 * rand01(seed + 50u) - 12.5);
+        double rVar = r1 + (3.0 * rand01(seed + 51u) - 1.5);
+        double x = rVar * Cos(a);
+        double z = rVar * Sin(a);
+        drawTreeAt(x, z, anim, leavesOnly?0:barkTexture, leafTexture, showNormals, seed, leavesOnly);
+    }
+    int n2 = 6;
+    for (int i=0;i<n2;i++)
+    {
+        unsigned int seed = 67890u + (unsigned int)i*31u;
+        double a = i * (360.0 / n2) + 12.0 + (20.0 * rand01(seed + 50u) - 10.0);
+        double rVar = r2 + (3.5 * rand01(seed + 51u) - 1.75);
+        double x = rVar * Cos(a);
+        double z = rVar * Sin(a);
+        drawTreeAt(x, z, anim, leavesOnly?0:barkTexture, leafTexture, showNormals, seed, leavesOnly);
+    }
+    int n3 = 8;
+    for (int i=0;i<n3;i++)
+    {
+        unsigned int seed = 24680u + (unsigned int)i*41u;
+        double a = i * (360.0 / n3) + 8.0 + (18.0 * rand01(seed + 50u) - 9.0);
+        double rVar = r3 + (4.0 * rand01(seed + 51u) - 2.0);
+        double x = rVar * Cos(a);
+        double z = rVar * Sin(a);
+        drawTreeAt(x, z, anim, leavesOnly?0:barkTexture, leafTexture, showNormals, seed, leavesOnly);
+    }
+    int n4 = 10;
+    for (int i=0;i<n4;i++)
+    {
+        unsigned int seed = 13579u + (unsigned int)i*53u;
+        double a = i * (360.0 / n4) + 15.0 + (16.0 * rand01(seed + 50u) - 8.0);
+        double rVar = r4 + (4.5 * rand01(seed + 51u) - 2.25);
+        double x = rVar * Cos(a);
+        double z = rVar * Sin(a);
+        drawTreeAt(x, z, anim, leavesOnly?0:barkTexture, leafTexture, showNormals, seed, leavesOnly);
+    }
+}
+
 /* Recursive branch: starts at origin, grows along +Y. */
-static void drawBranch(double len, double r, int depth, double swayDeg, unsigned int texture, int showNormals, unsigned int seed)
+static void drawBranch(double len, double r, int depth, double swayDeg, unsigned int texture, int showNormals, unsigned int leafTexture, unsigned int seed, int leavesOnly)
 {
     if (depth <= 0 || len <= 0.05 || r <= 0.015) return;
 
-    double taper = 0.70 + 0.15 * rand01(seed + 21u);
+    double taper = 0.65 + 0.10 * rand01(seed + 21u);
     double rEnd = r * taper;
-    if (depth <= 2) rEnd *= 0.75;
+    if (depth <= 2) rEnd *= 0.70;
     if (depth == 1) rEnd = fmax(0.02, rEnd * 0.5);
 
     glPushMatrix();
 
-    unsigned int sides = (depth >= 4) ? 24 : (depth >= 2 ? 18 : 14);
-    int segs = 3 + (len > 2.0 ? 1 : 0);
+    unsigned int sides = (depth >= 4) ? 6 : (depth >= 2 ? 8 : 12);
+    int segs = 2 + (len > 2.5 ? 1 : 0);
     double segLen = len / (double)segs;
     double vScale = fmax(1.0, len * 1.5);
     double uOff = rand01(seed + 100u);
     double prevR = r;
-    
-    /* Add slight overlap between segments to hide seams */
-    double overlap = 0.015;
 
     for (int si=0; si<segs; ++si)
     {
@@ -109,28 +232,39 @@ static void drawBranch(double len, double r, int depth, double swayDeg, unsigned
         double t1 = (double)(si+1) / (double)segs;
         double r0 = r - (r - rEnd) * t0;
         double r1 = r - (r - rEnd) * t1;
-        
-        /* Extend segment slightly to overlap with next segment */
-        double actualLen = (si < segs-1) ? segLen + overlap : segLen;
 
-        drawFrustum(r0, r1, actualLen, sides, texture, uOff, vScale * (actualLen/len));
-        if (showNormals)
+        /* Small overlap factor to prevent gaps when curved */
+        double actualSegLen = (si < segs-1) ? segLen * 1.02 : segLen;
+
+        if (!leavesOnly)
         {
-            GLboolean wasLit = glIsEnabled(GL_LIGHTING);
-            if (wasLit) glDisable(GL_LIGHTING);
-            drawFrustumNormals(r0, r1, actualLen);
-            if (wasLit) glEnable(GL_LIGHTING);
+            drawFrustum(r0, r1, actualSegLen, sides, texture, uOff, vScale * (segLen/len));
+            if (showNormals)
+            {
+                GLboolean wasLit = glIsEnabled(GL_LIGHTING);
+                if (wasLit) glDisable(GL_LIGHTING);
+                drawFrustumNormals(r0, r1, actualSegLen);
+                if (wasLit) glEnable(GL_LIGHTING);
+            }
         }
 
-        glTranslated(0, segLen, 0);
+        /* Rotate before translating to pivot at current base */
         if (si < segs-1)
         {
             double bend = 2.0 + 3.0 * rand01(seed + 22u + si*3u);
             double bendDir = 360.0 * rand01(seed + 23u + si*7u);
             double sway = 0.8 * Sin(swayDeg + (double)(depth+si)*17.0);
             double ax = Cos(bendDir), az = Sin(bendDir);
+            /* Translate to segment end first */
+            glTranslated(0, segLen, 0);
+            /* Then rotate for next segment */
             glRotated(bend + sway, ax, 0, az);
             uOff = fmod(uOff + 0.15 * rand01(seed + 101u + si*5u), 1.0);
+        }
+        else
+        {
+            /* Last segment: just translate */
+            glTranslated(0, segLen, 0);
         }
         prevR = r1;
     }
@@ -155,7 +289,8 @@ static void drawBranch(double len, double r, int depth, double swayDeg, unsigned
         double angY = baseAngleOffset + i * angleSpacing + (30.0 * rand01(cseed + 1u) - 15.0);
         double verticalBias = (depth <= 2) ? 8.0 : 0.0;
         double tilt = 25.0 + 10.0 * rand01(cseed + 2u) - verticalBias;
-        double scale = 0.70 + 0.18 * rand01(cseed + 3u);
+        /* Make first branches (depth >= 4) shorter */
+        double scale = (depth >= 4) ? (0.55 + 0.12 * rand01(cseed + 3u)) : (0.70 + 0.18 * rand01(cseed + 3u));
         double swayYaw = 2.5 * Sin(swayDeg + (double)(i*depth)*13.0);
 
         glPushMatrix();
@@ -167,13 +302,11 @@ static void drawBranch(double len, double r, int depth, double swayDeg, unsigned
         double joinR = prevR;
         if (joinR > 0.001 && childLen > 0.05)
         {
+            double childBaseR = joinR * (0.85 + 0.06 * rand01(cseed + 4u)); /* 0.85..0.91 - thinner branches from 2nd level */
+            double adapterLen = fmin(childLen * 0.22, 0.35);
             double uOffC = rand01(cseed + 200u);
-
-            if (depth > 1)
+            if (!leavesOnly)
             {
-                /* Usual case: add a short adapter then recurse */
-                double childBaseR = joinR * (0.88 + 0.07 * rand01(cseed + 4u)); /* 0.88..0.95 */
-                double adapterLen = fmin(childLen * 0.22, 0.35);
                 drawFrustum(joinR * 0.98, childBaseR, adapterLen, sides, texture, uOffC, fmax(1.0, adapterLen * 1.5));
                 if (showNormals)
                 {
@@ -182,30 +315,19 @@ static void drawBranch(double len, double r, int depth, double swayDeg, unsigned
                     drawFrustumNormals(joinR * 0.98, childBaseR, adapterLen);
                     if (wasLit) glEnable(GL_LIGHTING);
                 }
-                glTranslated(0, adapterLen, 0);
-                double remain = childLen - adapterLen;
-                if (remain > 0.05)
-                {
-                    drawBranch(remain, childBaseR, depth - 1, swayDeg, texture, showNormals, cseed);
-                }
             }
-            else
+            glTranslated(0, adapterLen, 0);
+            double remain = childLen - adapterLen;
+            if (remain > 0.05)
             {
-                /* Terminal tip: draw a full-length twig instead of only an adapter */
-                double tipLen = childLen;
-                double tipR  = fmax(0.004, joinR * 0.35);
-                drawFrustum(joinR * 0.98, tipR, tipLen, sides, texture, uOffC, fmax(1.0, tipLen * 1.5));
-                if (showNormals)
-                {
-                    GLboolean wasLit = glIsEnabled(GL_LIGHTING);
-                    if (wasLit) glDisable(GL_LIGHTING);
-                    drawFrustumNormals(joinR * 0.98, tipR, tipLen);
-                    if (wasLit) glEnable(GL_LIGHTING);
-                }
+                drawBranch(remain, childBaseR, depth - 1, swayDeg, texture, showNormals, leafTexture, cseed, leavesOnly);
             }
         }
         glPopMatrix();
     }
+    
+    /* Add leaves to this branch if appropriate depth and leafTexture provided */
+    addLeavesToBranch(depth, len, r, swayDeg, leafTexture, seed);
 
     glPopMatrix();
 }
@@ -222,103 +344,85 @@ static double approxTerrainY(double x, double z)
     return -3.0 + h * steep;
 }
 
-/* Draw a single tree at world position (x,z), rooted on terrain */
-static void drawTreeAt(double x, double z, double anim, unsigned int texture, int showNormals, unsigned int seed)
+/* Draw a single tree from a Tree struct */
+void drawTree(const Tree* t, int leavesOnly)
 {
-    double y = approxTerrainY(x, z);
-    double baseLen = 2.5 + 1.2 * rand01(seed + 5u);
-    double baseRad = 0.13 + 0.05 * rand01(seed + 6u);
-    int depth = 4 + (int)(2.0 * rand01(seed + 7u));
+    if (!t) return;
 
     glPushMatrix();
-    glTranslated(x, y, z);
+    glTranslated(t->x, t->y, t->z);
     /* Small base tilt to avoid perfect verticals */
-    double tilt = 2.0 * (rand01(seed+11u) - 0.5);
-    double tiltDir = 360.0 * rand01(seed+12u);
+    double tilt = 2.0 * (rand01(t->seed+11u) - 0.5);
+    double tiltDir = 360.0 * rand01(t->seed+12u);
     glRotated(tiltDir, 0,1,0);
     glRotated(tilt, 1,0,0);
 
-    /* Base flare before main trunk for more natural look */
+    /* Base flare before main trunk - use same side count as trunk */
+    unsigned int trunkSides = (t->depth >= 4) ? 6 : 8;
     double flareLen = 0.35;
-    double flareR0  = baseRad * 1.25;
-    double flareR1  = baseRad;
-    double uOffFlare = rand01(seed + 200u);
-    drawFrustum(flareR0, flareR1, flareLen, 24, texture, uOffFlare, fmax(1.0, flareLen * 1.5));
-    if (showNormals)
+    double flareR0  = t->baseRadius * 1.45;
+    double flareR1  = t->baseRadius;
+    double uOffFlare = rand01(t->seed + 200u);
+    if (!leavesOnly)
     {
-        GLboolean wasLit = glIsEnabled(GL_LIGHTING);
-        if (wasLit) glDisable(GL_LIGHTING);
-        drawFrustumNormals(flareR0, flareR1, flareLen);
-        if (wasLit) glEnable(GL_LIGHTING);
+        drawFrustum(flareR0, flareR1, flareLen, trunkSides, t->barkTexture, uOffFlare, fmax(1.0, flareLen * 1.5));
+        if (t->showNormals)
+        {
+            GLboolean wasLit = glIsEnabled(GL_LIGHTING);
+            if (wasLit) glDisable(GL_LIGHTING);
+            drawFrustumNormals(flareR0, flareR1, flareLen);
+            if (wasLit) glEnable(GL_LIGHTING);
+        }
     }
     glTranslated(0, flareLen, 0);
-    baseLen = (baseLen > flareLen) ? (baseLen - flareLen) : baseLen;
+    double baseLen = (t->baseLength > flareLen) ? (t->baseLength - flareLen) : t->baseLength;
 
-    drawBranch(baseLen, baseRad, depth, anim, texture, showNormals, seed);
+    drawBranch(baseLen, t->baseRadius, t->depth, t->anim, t->barkTexture, t->showNormals, t->leafTexture, t->seed, leavesOnly);
     glPopMatrix();
 }
 
+/* Draw a single tree at world position (x,z), rooted on terrain */
+static void drawTreeAt(double x, double z, double anim, unsigned int barkTexture, unsigned int leafTexture, int showNormals, unsigned int seed, int leavesOnly)
+{
+    double y = approxTerrainY(x, z);
+    double baseLen = 2.5 + 1.2 * rand01(seed + 5u);
+    double baseRad = 0.25 + 0.08 * rand01(seed + 6u);
+    int depth = 4 + (int)(2.0 * rand01(seed + 7u));
+
+    Tree t = {
+        .x = x, .y = y, .z = z,
+        .baseLength = baseLen,
+        .baseRadius = baseRad,
+        .depth = depth,
+        .barkTexture = barkTexture,
+        .leafTexture = leafTexture,
+        .anim = anim,
+        .showNormals = showNormals,
+        .seed = seed
+    };
+    drawTree(&t, leavesOnly);
+}
+
 /* Public entry: draw a ring (or two) of trees around origin/bullseyes */
-void drawTreeScene(double anim, int showNormals, unsigned int texture)
+void drawTreeScene(double anim, int showNormals, unsigned int barkTexture, unsigned int leafTexture)
 {
     /* Material: slightly less specular for bark */
     float spec[] = {0.05f,0.05f,0.05f,1.0f};
     glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, spec);
     glMaterialf(GL_FRONT_AND_BACK, GL_SHININESS, 6.0f);
 
-    /* Four rings of trees with randomized positions for less uniformity */
-    const double r1 = 15.0;
-    const double r2 = 22.0;
-    const double r3 = 29.0;
-    const double r4 = 36.0;
-
-    /* Ring 1 */
-    int n1 = 8;
-    for (int i=0;i<n1;i++)
-    {
-        unsigned int seed = 12345u + (unsigned int)i*17u;
-        double a = i * (360.0 / n1) + (25.0 * rand01(seed + 50u) - 12.5);
-        double rVar = r1 + (3.0 * rand01(seed + 51u) - 1.5);
-        double x = rVar * Cos(a);
-        double z = rVar * Sin(a);
-        drawTreeAt(x, z, anim, texture, showNormals, seed);
-    }
-    /* Ring 2 */
-    int n2 = 12;
-    for (int i=0;i<n2;i++)
-    {
-        unsigned int seed = 67890u + (unsigned int)i*31u;
-        double a = i * (360.0 / n2) + 12.0 + (20.0 * rand01(seed + 50u) - 10.0);
-        double rVar = r2 + (3.5 * rand01(seed + 51u) - 1.75);
-        double x = rVar * Cos(a);
-        double z = rVar * Sin(a);
-        drawTreeAt(x, z, anim, texture, showNormals, seed);
-    }
-    /* Ring 3 */
-    int n3 = 16;
-    for (int i=0;i<n3;i++)
-    {
-        unsigned int seed = 24680u + (unsigned int)i*41u;
-        double a = i * (360.0 / n3) + 8.0 + (18.0 * rand01(seed + 50u) - 9.0);
-        double rVar = r3 + (4.0 * rand01(seed + 51u) - 2.0);
-        double x = rVar * Cos(a);
-        double z = rVar * Sin(a);
-        drawTreeAt(x, z, anim, texture, showNormals, seed);
-    }
-    /* Ring 4 */
-    int n4 = 20;
-    for (int i=0;i<n4;i++)
-    {
-        unsigned int seed = 13579u + (unsigned int)i*53u;
-        double a = i * (360.0 / n4) + 15.0 + (16.0 * rand01(seed + 50u) - 8.0);
-        double rVar = r4 + (4.5 * rand01(seed + 51u) - 2.25);
-        double x = rVar * Cos(a);
-        double z = rVar * Sin(a);
-        drawTreeAt(x, z, anim, texture, showNormals, seed);
-    }
+    /* Iterate via shared helper */
+    drawForest(anim, showNormals, barkTexture, leafTexture, 0);
 
     /* Restore generic specular */
     float white[] = {1,1,1,1};
     glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, white);
     glMaterialf(GL_FRONT_AND_BACK, GL_SHININESS, 32.0f);
+}
+
+/* Draw only leaves for all trees (separate function for transparent pass) */
+void drawTreeLeaves(double anim, unsigned int leafTexture)
+{
+    if (!leafTexture) return;
+    drawForest(anim, 0, 0, leafTexture, 1);
 }

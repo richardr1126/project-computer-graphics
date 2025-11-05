@@ -67,9 +67,15 @@ int showNormals = 0;       //  Toggle drawing of normal vectors
 unsigned int groundTexture = 0; // Ground texture ID
 unsigned int woodTexture = 0;   // Wood texture ID for bullseyes
 unsigned int barkTexture = 0;   // Bark texture ID for trees
+unsigned int leafTexture = 0;   // Leaf texture ID for tree foliage
 
 // Trees animation (wind sway)
 double zhTrees = 0;             // Animation angle for tree sway (degrees)
+
+// FPS tracking
+double fps = 0.0;               // Current frames per second
+int frameCount = 0;             // Frame counter for FPS calculation
+double lastFPSTime = 0.0;       // Last time FPS was calculated
 
 /*
  *  Draw HUD with controls and status information
@@ -98,7 +104,7 @@ void drawHUD()
     // Debug status line
     yBottom += 15;
     glWindowPos2i(5, yBottom);
-    Print("Normals: %s", showNormals?"On":"Off");
+    Print("Normals: %s | FPS: %.1f", showNormals?"On":"Off", fps);
     
     
     // Controls section
@@ -158,7 +164,6 @@ void enableLighting()
     drawLightBall(Position[0], Position[1], Position[2], 0.15);
 
     // Enable lighting
-    glEnable(GL_NORMALIZE);
     glEnable(GL_LIGHTING);
     glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE);
     glEnable(GL_COLOR_MATERIAL);
@@ -200,15 +205,41 @@ void display()
     if (light) enableLighting();
     else glDisable(GL_LIGHTING);
 
+    // ===== OPAQUE PASS: Draw all opaque objects first =====
+    glDepthMask(GL_TRUE);
+    glDisable(GL_BLEND);
+    
     // Draw bullseyes (animated)
     // showNormals controls whether normal vectors are drawn for debugging
     drawBullseyeScene(zhTargets, showNormals, woodTexture);
 
-    // Draw surrounding forest of trees (uses bark texture)
-    drawTreeScene(zhTrees, showNormals, barkTexture);
-
     // Draw ground terrain (steepness, size, groundY, texture, showNormals)
     drawGround(0.5, 45.0, -3.0, groundTexture, showNormals);
+    
+    // Draw tree trunks and branches (opaque, uses bark texture)
+    glEnable(GL_CULL_FACE);
+    glFrontFace(GL_CW);   // Tree geometry winds clockwise; treat CW as front
+    drawTreeScene(zhTrees, showNormals, barkTexture, 0);
+    glFrontFace(GL_CCW);  // Restore default front-face winding
+    glDisable(GL_CULL_FACE);
+
+    // ===== TRANSPARENT PASS: Draw all transparent objects last =====
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glDepthMask(GL_FALSE); // CRITICAL: disable depth writing for transparency
+    
+    // Draw tree leaves (transparent)
+    glEnable(GL_TEXTURE_2D);
+    glBindTexture(GL_TEXTURE_2D, leafTexture);
+    glEnable(GL_ALPHA_TEST);
+    glAlphaFunc(GL_GREATER, 0.1f);
+    drawTreeLeaves(zhTrees, leafTexture);
+    glDisable(GL_ALPHA_TEST);
+    glDisable(GL_TEXTURE_2D);
+    
+    // Restore render state
+    glDepthMask(GL_TRUE);
+    glDisable(GL_BLEND);
     
     //  Start white coloring
     glColor3f(1, 1, 1);
@@ -216,9 +247,9 @@ void display()
     if (axes) drawAxes(5.0); // Draw axes
     if (showHUD) drawHUD(); // Draw HUD
 
-    //  Make sure changes appear onscreen
+    //  Present frame
     ErrCheck("display");
-    glFlush();
+    //glFlush();
     glutSwapBuffers();
 }
 
@@ -392,9 +423,20 @@ void idle()
 {
     static double lastT = 0.0;
     double t = glutGet(GLUT_ELAPSED_TIME) / 1000.0;
-    if (lastT == 0.0) lastT = t;
+    if (lastT == 0.0) {
+        lastT = t;
+        lastFPSTime = t;
+    }
     double dt = t - lastT;
     lastT = t;
+
+    // Calculate FPS every 0.5 seconds
+    frameCount++;
+    if (t - lastFPSTime >= 0.5) {
+        fps = frameCount / (t - lastFPSTime);
+        frameCount = 0;
+        lastFPSTime = t;
+    }
 
     // First-person: update movement from WASD continuously
     if (mode == 2)
@@ -474,6 +516,15 @@ int main(int argc, char *argv[])
     woodTexture = LoadTexBMP("textures/wood.bmp");
     //  Load bark texture for trees
     barkTexture = LoadTexBMP("textures/bark.bmp");
+    glBindTexture(GL_TEXTURE_2D, barkTexture);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+    //  Load leaf texture with proper alpha settings
+    leafTexture = LoadTexBMP("textures/leaf.bmp");
+    glBindTexture(GL_TEXTURE_2D, leafTexture);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     //  Tell GLUT to call "display" when the scene should be drawn
     glutDisplayFunc(display);
     //  Tell GLUT to call "idle" when there is nothing else to do (animate)
