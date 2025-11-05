@@ -284,16 +284,16 @@ void key(unsigned char ch, int x, int y)
         ylight += 0.1;
     else if (ch == '2')
         ylight -= 0.1;
-    //  Light distance (3=decrease, 4=increase)
+    //  Light distance (3=increase, 4=decrease)
     else if (ch == '3')
-    {
-        ldist -= 0.5;
-        if (ldist < 0.5) ldist = 0.5;
-    }
-    else if (ch == '4')
     {
         ldist += 0.5;
         if (ldist > 50.0) ldist = 50.0;
+    }
+    else if (ch == '4')
+    {
+        ldist -= 0.5;
+        if (ldist < 0.5) ldist = 0.5;
     }
     //  Toggle light rotation
     else if (ch == '5')
@@ -450,9 +450,9 @@ int main(int argc, char *argv[])
         Fatal("Error initializing GLEW\n");
 #endif
     //  Load ground texture
-    groundTexture = LoadTexBMP("ground.bmp");
+    groundTexture = LoadTexBMP("textures/ground.bmp");
     //  Load wood texture for bullseyes
-    woodTexture = LoadTexBMP("wood.bmp");
+    woodTexture = LoadTexBMP("textures/wood.bmp");
     //  Tell GLUT to call "display" when the scene should be drawn
     glutDisplayFunc(display);
     //  Tell GLUT to call "idle" when there is nothing else to do (animate)

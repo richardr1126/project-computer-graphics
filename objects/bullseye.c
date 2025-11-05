@@ -1,23 +1,10 @@
 /*
- *  Objects module - implementation file
- *  Contains drawing functions for 3D objects
+ *  Bullseye object - implementation file
+ *  Contains drawing functions for bullseye targets
  */
-#include "utils.h"
-#include "objects.h"
 
-/*
- *  Vertex on a unit sphere given angles (degrees)
- */
-static void SphereVertex(double th, double ph)
-{
-    double x = Sin(th) * Cos(ph);
-    double y = Cos(th) * Cos(ph);
-    double z = Sin(ph);
-    glNormal3d(x, y, z);
-    // Texture coordinates: spherical mapping
-    glTexCoord2d(th / 360.0, (ph + 90.0) / 180.0);
-    glVertex3d(x, y, z);
-}
+#include "../utils.h"
+#include "bullseye.h"
 
 /*
  *  Apply translation and orientation for a bullseye given Bullseye struct
@@ -52,7 +39,7 @@ static void applyBullseyeTransform(const Bullseye* b)
 /*
  *  Draw a bullseye from a Bullseye struct
  */
-static void drawBullseye(const Bullseye* b, unsigned int texture)
+void drawBullseye(const Bullseye* b, unsigned int texture)
 {
     if (!b) return;
     // Save transformation
@@ -201,7 +188,7 @@ static void drawBullseye(const Bullseye* b, unsigned int texture)
 }
 
 /*
- *  Draw the scene with multiple bullseye targets
+ *  Draw normals for a bullseye (helper for debugging)
  */
 static void drawBullseyeNormals(const Bullseye* b)
 {
@@ -251,30 +238,6 @@ static void drawBullseyeNormals(const Bullseye* b)
 }
 
 /*
- *  Draw a lit sphere using latitude-longitude quads
- *  at (x,y,z) with radius r and angular increment inc degrees
- */
-static void drawBall(double x, double y, double z, double r, int inc)
-{
-    if (inc < 1) inc = 1;
-    // Save transform and move/scale
-    glPushMatrix();
-    glTranslated(x, y, z);
-    glScaled(r, r, r);
-    // Bands of latitude
-    for (int ph = -90; ph < 90; ph += inc)
-    {
-        glBegin(GL_QUAD_STRIP);
-        for (int th = 0; th <= 360; th += 2 * inc)
-        {
-            SphereVertex(th, ph);
-            SphereVertex(th, ph + inc);
-        }
-        glEnd();
-    }
-    glPopMatrix();
-}
-/*
  *  Helper to draw normals for a bullseye if requested
  */
 static void drawBullseyeWithNormals(const Bullseye* b, unsigned int texture, int showNormals)
@@ -289,6 +252,9 @@ static void drawBullseyeWithNormals(const Bullseye* b, unsigned int texture, int
     }
 }
 
+/*
+ *  Draw the scene with multiple bullseye targets
+ */
 void drawBullseyeScene(double zh, int showNormals, unsigned int texture)
 {
     double off = 3.0 * Sin(zh);
@@ -348,228 +314,4 @@ void drawBullseyeScene(double zh, int showNormals, unsigned int texture)
         .r = 0.0, .g = 1.0, .b = 1.0
     };
     drawBullseyeWithNormals(&b5, texture, showNormals);
-}
-
-/*
- *  Draw a small sphere to represent the light (unlit so it appears emissive)
- */
-void drawLightBall(double x, double y, double z, double r)
-{
-    glPushMatrix();
-    // Draw unlit so it appears emissive and not affected by scene lighting
-    GLboolean wasLit = glIsEnabled(GL_LIGHTING);
-    glDisable(GL_LIGHTING);
-    
-    // Draw as bright white/yellow color to represent light
-    glColor3f(1, 1, 0.8);
-    drawBall(x, y, z, r, 3);
-    
-    if (wasLit) glEnable(GL_LIGHTING);
-    glPopMatrix();
-}
-
-/*
- *  Compute height for terrain at given (x,z) position
- *  Uses combination of sine waves to create varied terrain
- *  steepness: multiplier for terrain height variation (1.0 = default)
- */
-static double terrainHeight(double x, double z, double steepness)
-{
-    // Combine multiple sine waves for interesting terrain
-    double h = 0.0;
-    h += 0.3 * sin(x * 0.5) * cos(z * 0.5);
-    h += 0.2 * sin(x * 0.8 + z * 0.3);
-    h += 0.15 * cos(x * 1.2 - z * 0.7);
-    return h * steepness;
-}
-
-/*
- *  Compute normal vector for terrain at position (x,z)
- *  Uses finite differences to approximate the normal
- */
-static void terrainNormal(double x, double z, double steepness, double* nx, double* ny, double* nz)
-{
-    const double delta = 0.1;
-    // Sample heights around the point
-    double hL = terrainHeight(x - delta, z, steepness);
-    double hR = terrainHeight(x + delta, z, steepness);
-    double hD = terrainHeight(x, z - delta, steepness);
-    double hU = terrainHeight(x, z + delta, steepness);
-    
-    // Compute tangent vectors
-    double tx = 2.0 * delta;
-    double ty = hR - hL;
-    double tz = 0.0;
-    
-    double ux = 0.0;
-    double uy = hU - hD;
-    double uz = 2.0 * delta;
-    
-    // Cross product to get normal (flipped order for correct direction)
-    double cx = uy * tz - uz * ty;
-    double cy = uz * tx - ux * tz;
-    double cz = ux * ty - uy * tx;
-    
-    // Normalize
-    double len = sqrt(cx * cx + cy * cy + cz * cz);
-    if (len > 0.0)
-    {
-        *nx = cx / len;
-        *ny = cy / len;
-        *nz = cz / len;
-    }
-    else
-    {
-        *nx = 0.0;
-        *ny = 1.0;
-        *nz = 0.0;
-    }
-}
-
-/*
- *  Draw ground terrain with varied height
- *  steepness: terrain height multiplier
- *  size: ground extends from -size to +size in X and Z
- *  groundY: base height offset in Y direction
- *  texture: OpenGL texture ID (0 for no texture)
- *  showNormals: whether to draw normal vectors
- */
-void drawGround(double steepness, double size, double groundY, unsigned int texture, int showNormals)
-{
-    const double step = 0.5;  // Grid resolution
-    
-    // Set material properties for ground - minimal specular to avoid stretching artifacts
-    float groundSpecular[] = {0.05, 0.05, 0.05, 1.0}; // Very low specular
-    glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, groundSpecular);
-    glMaterialf(GL_FRONT_AND_BACK, GL_SHININESS, 2.0); // Low shininess for matte surface
-    
-    // Enable texturing if texture provided
-    if (texture)
-    {
-        glEnable(GL_TEXTURE_2D);
-        glBindTexture(GL_TEXTURE_2D, texture);
-        glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
-        glColor3f(1.0, 1.0, 1.0); // White to show true texture colors
-    }
-    else
-    {
-        glColor3f(0.3, 0.5, 0.2); // Green-ish ground color
-    }
-    
-    // Texture coordinate scale (how many times texture repeats across ground)
-    const double texScale = 0.1;
-    
-    // Draw individual quads for proper normal calculation per vertex
-    glBegin(GL_QUADS);
-    for (double x = -size; x < size; x += step)
-    {
-        for (double z = -size; z < size; z += step)
-        {
-            // Four corners of the quad with individual normals
-            double h1, h2, h3, h4;
-            double nx1, ny1, nz1;
-            double nx2, ny2, nz2;
-            double nx3, ny3, nz3;
-            double nx4, ny4, nz4;
-            
-            // Bottom-left corner (x, z)
-            h1 = terrainHeight(x, z, steepness);
-            terrainNormal(x, z, steepness, &nx1, &ny1, &nz1);
-            glNormal3d(nx1, ny1, nz1);
-            if (texture) glTexCoord2d(x * texScale, z * texScale);
-            glVertex3d(x, groundY + h1, z);
-            
-            // Bottom-right corner (x+step, z)
-            h2 = terrainHeight(x + step, z, steepness);
-            terrainNormal(x + step, z, steepness, &nx2, &ny2, &nz2);
-            glNormal3d(nx2, ny2, nz2);
-            if (texture) glTexCoord2d((x + step) * texScale, z * texScale);
-            glVertex3d(x + step, groundY + h2, z);
-            
-            // Top-right corner (x+step, z+step)
-            h3 = terrainHeight(x + step, z + step, steepness);
-            terrainNormal(x + step, z + step, steepness, &nx3, &ny3, &nz3);
-            glNormal3d(nx3, ny3, nz3);
-            if (texture) glTexCoord2d((x + step) * texScale, (z + step) * texScale);
-            glVertex3d(x + step, groundY + h3, z + step);
-            
-            // Top-left corner (x, z+step)
-            h4 = terrainHeight(x, z + step, steepness);
-            terrainNormal(x, z + step, steepness, &nx4, &ny4, &nz4);
-            glNormal3d(nx4, ny4, nz4);
-            if (texture) glTexCoord2d(x * texScale, (z + step) * texScale);
-            glVertex3d(x, groundY + h4, z + step);
-        }
-    }
-    glEnd();
-    
-    // Disable texturing after drawing
-    if (texture)
-    {
-        glDisable(GL_TEXTURE_2D);
-    }
-    
-    // Restore default specular material properties
-    float white[] = {1.0, 1.0, 1.0, 1.0};
-    glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, white);
-    glMaterialf(GL_FRONT_AND_BACK, GL_SHININESS, 32.0);
-    
-    // Draw normals if requested
-    if (showNormals)
-    {
-        GLboolean wasLit = glIsEnabled(GL_LIGHTING);
-        if (wasLit) glDisable(GL_LIGHTING);
-        
-        glColor3f(1.0, 1.0, 0.0); // Yellow normals
-        const double normalLen = 0.3;
-        const double normalStep = 1.0; // Sparse normals for visibility
-        
-        glBegin(GL_LINES);
-        for (double x = -size; x <= size; x += normalStep)
-        {
-            for (double z = -size; z <= size; z += normalStep)
-            {
-                double h = terrainHeight(x, z, steepness);
-                double nx, ny, nz;
-                terrainNormal(x, z, steepness, &nx, &ny, &nz);
-                
-                glVertex3d(x, groundY + h, z);
-                glVertex3d(x + nx * normalLen, groundY + h + ny * normalLen, z + nz * normalLen);
-            }
-        }
-        glEnd();
-        
-        if (wasLit) glEnable(GL_LIGHTING);
-    }
-}
-
-/*
- *  Draw axes
- *  Length is the axis length in world coordinates
- */
-void drawAxes(double len)
-{
-    //  Save transformation
-    glPushMatrix();
-
-    //  Draw axes
-    glBegin(GL_LINES);
-    glVertex3d(0.0, 0.0, 0.0);
-    glVertex3d(len, 0.0, 0.0);
-    glVertex3d(0.0, 0.0, 0.0);
-    glVertex3d(0.0, len, 0.0);
-    glVertex3d(0.0, 0.0, 0.0);
-    glVertex3d(0.0, 0.0, len);
-    glEnd();
-
-    //  Label axes
-    glRasterPos3d(len, 0.0, 0.0);
-    Print("X");
-    glRasterPos3d(0.0, len, 0.0);
-    Print("Y");
-    glRasterPos3d(0.0, 0.0, len);
-    Print("Z");
-
-    //  Undo transformations
-    glPopMatrix();
 }

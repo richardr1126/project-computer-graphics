@@ -30,8 +30,21 @@ endif
 	g++ -c $(CFLG)  $<
 
 #  Link
-project: main.o objects.o view.o utils.o
+project: main.o bullseye.o ground.o lighting.o axes.o view.o utils.o
 	gcc $(CFLG) -o $@ $^  $(LIBS)
+
+# Compile objects directory
+bullseye.o: objects/bullseye.c
+	gcc -c $(CFLG) -o $@ $<
+
+ground.o: objects/ground.c
+	gcc -c $(CFLG) -o $@ $<
+
+lighting.o: objects/lighting.c
+	gcc -c $(CFLG) -o $@ $<
+
+axes.o: objects/axes.c
+	gcc -c $(CFLG) -o $@ $<
 
 #  Clean
 clean:
