@@ -62,11 +62,6 @@ zip -r project.zip .
 | p/P    | Pause/resume bullseye motion |
 | n/N    | Toggle normals debug lines |
 
-### Builder-only Controls
-| Key    | Action |
-|--------|--------|
-| t/T    | Toggle ground on/off |
-
 ## How to run
 
 ```
@@ -81,3 +76,5 @@ make        # builds the project
 <p class="attribution">"<a rel="noopener noreferrer" href="https://www.flickr.com/photos/44071822@N08/4727355663">High Quality Tileable Light Wood Texture 1</a>" by <a rel="noopener noreferrer" href="https://www.flickr.com/photos/44071822@N08">webtreats</a> is licensed under <a rel="noopener noreferrer" href="https://creativecommons.org/licenses/by/2.0/?ref=openverse">CC BY 2.0 <img src="https://mirrors.creativecommons.org/presskit/icons/cc.svg" style="height: 1em; margin-right: 0.125em; display: inline;" /><img src="https://mirrors.creativecommons.org/presskit/icons/by.svg" style="height: 1em; margin-right: 0.125em; display: inline;" /></a>.</p>
 
 <p class="attribution">"<a rel="noopener noreferrer" href="https://www.flickr.com/photos/93421824@N06/8494824780">Soft Fur</a>" by <a rel="noopener noreferrer" href="https://www.flickr.com/photos/93421824@N06">Filter Forge</a> is licensed under <a rel="noopener noreferrer" href="https://creativecommons.org/licenses/by/2.0/?ref=openverse">CC BY 2.0 <img src="https://mirrors.creativecommons.org/presskit/icons/cc.svg" style="height: 1em; margin-right: 0.125em; display: inline;" /><img src="https://mirrors.creativecommons.org/presskit/icons/by.svg" style="height: 1em; margin-right: 0.125em; display: inline;" /></a>.</p>
+
+<p class="attribution">"<a rel="noopener noreferrer" href="https://www.flickr.com/photos/25797459@N06/22030135762">bark 4</a>" by <a rel="noopener noreferrer" href="https://www.flickr.com/photos/25797459@N06">zaphad1</a> is licensed under <a rel="noopener noreferrer" href="https://creativecommons.org/licenses/by/2.0/?ref=openverse">CC BY 2.0 <img src="https://mirrors.creativecommons.org/presskit/icons/cc.svg" style="height: 1em; margin-right: 0.125em; display: inline;" /><img src="https://mirrors.creativecommons.org/presskit/icons/by.svg" style="height: 1em; margin-right: 0.125em; display: inline;" /></a>.</p>

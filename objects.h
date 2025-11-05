@@ -11,5 +11,6 @@
 #include "objects/ground.h"
 #include "objects/lighting.h"
 #include "objects/axes.h"
+#include "objects/tree.h"
 
 #endif

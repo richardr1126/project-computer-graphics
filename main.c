@@ -5,6 +5,7 @@
  *  View Controls:
  *    TAB    Cycle view modes: Orthographic -> Perspective (orbit) -> First-Person
  *    +/-    Change field of view (perspective modes)
+ *    [/]    Zoom in/out (orbit modes only)
  *    0      Reset view (camera position/angles, FOV)
  *    g/G    Toggle axes display
  *    h/H    Toggle HUD
@@ -38,7 +39,7 @@ int axes = 0; //  Display axes
 int mode = 2; //  View mode: 0=Orthogonal, 1=Perspective (orbit), 2=First-Person
 int fov = 55; //  Field of view for perspective
 double asp = 1;   //  Aspect ratio
-double dim = 8.0; //  World size for projection
+double dim = 25.0; //  World size for projection (increased to see full scene)
 int showHUD = 1;         //  HUD visibility toggle
 //  First-person camera
 double px = 0, py = 0, pz = 17; // Position of the camera in world coords
@@ -65,6 +66,10 @@ int showNormals = 0;       //  Toggle drawing of normal vectors
 //  Textures
 unsigned int groundTexture = 0; // Ground texture ID
 unsigned int woodTexture = 0;   // Wood texture ID for bullseyes
+unsigned int barkTexture = 0;   // Bark texture ID for trees
+
+// Trees animation (wind sway)
+double zhTrees = 0;             // Animation angle for tree sway (degrees)
 
 /*
  *  Draw HUD with controls and status information
@@ -79,9 +84,9 @@ void drawHUD()
     // Title and Mode
     glWindowPos2i(5, yBottom);
     if (mode == 0)
-        Print("Mode: Orthogonal | Angle=%d,%d", (int)th, (int)ph);
+        Print("Mode: Orthogonal | Angle=%d,%d | Zoom=%.1f", (int)th, (int)ph, dim);
     else if (mode == 1)
-        Print("Mode: Perspective | Angle=%d,%d | FOV=%d", (int)th, (int)ph, fov);
+        Print("Mode: Perspective | Angle=%d,%d | FOV=%d | Zoom=%.1f", (int)th, (int)ph, fov, dim);
     else
         Print("Mode: First-Person | Angle=%d,%d | Pos=(%.1f,%.1f,%.1f) | FOV=%d", (int)th, (int)ph, px, py, pz, fov);
     // Status line
@@ -105,7 +110,9 @@ void drawHUD()
     yTop -= 15;
     glWindowPos2i(5, yTop);
     if (mode == 0)
-        Print("  View: TAB)Modes  0)Reset  G)Axes  H)HUD  ESC)Exit");
+        Print("  View: TAB)Modes  [/])Zoom  0)Reset  G)Axes  H)HUD  ESC)Exit");
+    else if (mode == 1)
+        Print("  View: TAB)Modes  +/-)FOV  [/])Zoom  0)Reset  G)Axes  H)HUD  ESC)Exit");
     else
         Print("  View: TAB)Modes  +/-)FOV  0)Reset  G)Axes  H)HUD  ESC)Exit");
     // Camera Controls
@@ -193,9 +200,12 @@ void display()
     if (light) enableLighting();
     else glDisable(GL_LIGHTING);
 
-    // Draw the scene (bullseyes use their own animation angle)
+    // Draw bullseyes (animated)
     // showNormals controls whether normal vectors are drawn for debugging
     drawBullseyeScene(zhTargets, showNormals, woodTexture);
+
+    // Draw surrounding forest of trees (uses bark texture)
+    drawTreeScene(zhTrees, showNormals, barkTexture);
 
     // Draw ground terrain (steepness, size, groundY, texture, showNormals)
     drawGround(0.5, 45.0, -3.0, groundTexture, showNormals);
@@ -252,6 +262,7 @@ void key(unsigned char ch, int x, int y)
         py = 0;
         pz = 17;
         fov = 55;
+        dim = 25.0;
         // Reset view angles depending on mode
         if (mode == 2) {
             th = 0;
@@ -334,6 +345,12 @@ void key(unsigned char ch, int x, int y)
     } else if (ch == '+' && fov < 179) {
         if (mode > 0) fov++;
     }
+    //  Zoom in/out for orbit modes (adjust dim)
+    else if (ch == '[' && dim < 100.0) {
+        if (mode < 2) dim += 2.0;
+    } else if (ch == ']' && dim > 5.0) {
+        if (mode < 2) dim -= 2.0;
+    }
     //  Update projection
     Project(mode, fov, asp, dim);
     //  Tell GLUT it is necessary to redisplay the scene
@@ -391,6 +408,8 @@ void idle()
     // Bullseyes move only when enabled
     if (moveTargets)
         zhTargets = fmod(zhTargets + targetRate * dt, 360.0);
+    // Trees sway continuously (gentle)
+    zhTrees = fmod(zhTrees + 25.0 * dt, 360.0);
     glutPostRedisplay();
 }
 
@@ -453,6 +472,8 @@ int main(int argc, char *argv[])
     groundTexture = LoadTexBMP("textures/ground.bmp");
     //  Load wood texture for bullseyes
     woodTexture = LoadTexBMP("textures/wood.bmp");
+    //  Load bark texture for trees
+    barkTexture = LoadTexBMP("textures/bark.bmp");
     //  Tell GLUT to call "display" when the scene should be drawn
     glutDisplayFunc(display);
     //  Tell GLUT to call "idle" when there is nothing else to do (animate)

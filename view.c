@@ -15,8 +15,8 @@ void Project(int mode, int fov, double asp, double dim)
     //  Undo previous transformations
     glLoadIdentity();
     if (mode == 1)
-        //  Perspective transformation
-        gluPerspective(fov, asp, dim / 4, 4 * dim);
+        //  Perspective transformation - extend far plane to see entire scene
+        gluPerspective(fov, asp, dim / 16, 16 * dim);
     else if (mode == 2) {
         // First-person: use a much closer near plane to avoid clipping when near objects
         // Approximated with AI/LLM help
@@ -25,8 +25,8 @@ void Project(int mode, int fov, double asp, double dim)
         gluPerspective(fov, asp, near, far);
     }
     else
-        //  Orthogonal projection
-        glOrtho(-asp * dim, +asp * dim, -dim, +dim, -dim, +dim);
+        //  Orthogonal projection - extend clipping to see full scene
+        glOrtho(-asp * dim, +asp * dim, -dim, +dim, -8 * dim, +8 * dim);
     //  Switch to manipulating the model matrix
     glMatrixMode(GL_MODELVIEW);
     //  Undo previous transformations

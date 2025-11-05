@@ -35,7 +35,7 @@ endif
 	g++ -c $(CFLG)  $< -o $(OBJDIR)/$@
 
 #  Link
-project: $(OBJDIR)/main.o $(OBJDIR)/bullseye.o $(OBJDIR)/ground.o $(OBJDIR)/lighting.o $(OBJDIR)/axes.o $(OBJDIR)/view.o $(OBJDIR)/utils.o
+project: $(OBJDIR)/main.o $(OBJDIR)/bullseye.o $(OBJDIR)/ground.o $(OBJDIR)/lighting.o $(OBJDIR)/axes.o $(OBJDIR)/tree.o $(OBJDIR)/view.o $(OBJDIR)/utils.o
 	gcc $(CFLG) -o $@ $^  $(LIBS)
 
 # Compile objects directory
@@ -49,6 +49,9 @@ $(OBJDIR)/lighting.o: objects/lighting.c | $(OBJDIR)
 	gcc -c $(CFLG) -o $@ $<
 
 $(OBJDIR)/axes.o: objects/axes.c | $(OBJDIR)
+	gcc -c $(CFLG) -o $@ $<
+
+$(OBJDIR)/tree.o: objects/tree.c | $(OBJDIR)
 	gcc -c $(CFLG) -o $@ $<
 
 $(OBJDIR)/view.o: view.c | $(OBJDIR)
