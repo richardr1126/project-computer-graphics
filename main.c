@@ -3,8 +3,7 @@
  *
  *  Key Bindings:
  *  View Controls:
- *    TAB    Cycle view modes: Orthographic -> Perspective (orbit) ->
- * First-Person
+ *    TAB    Toggle view modes: Perspective (orbit) <-> First-Person
  *    +/-    Change field of view (perspective modes)
  *    [/]    Zoom in/out (orbit modes only)
  *    0      Reset view (camera position/angles, FOV)
@@ -13,7 +12,7 @@
  *    ESC    Exit
  *  Camera Controls:
  *    Mouse drag Look around (first-person mode)
- *    arrows     Look around (orthographic & perspective orbit modes)
+ *    arrows     Look around (perspective orbit mode)
  *    w/s        Move forward/backward (first-person mode only)
  *    a/d        Strafe left/right (first-person mode only)
  *  Lighting Controls:
@@ -41,7 +40,7 @@
 double th = 0.0; //  Azimuth of view angle (degrees)
 double ph = 0.0; //  Elevation of view angle (degrees)
 int axes = 0;    //  Display axes
-int mode = 2; //  View mode: 0=Orthogonal, 1=Perspective (orbit), 2=First-Person
+int mode = 2; //  View mode: 1=Perspective (orbit), 2=First-Person
 int fov = 55; //  Field of view for perspective
 double asp = 1;    //  Aspect ratio
 double dim = 25.0; //  World size for projection (increased to see full scene)
@@ -94,9 +93,7 @@ void drawHUD() {
 
   // Title and Mode
   glWindowPos2i(5, yBottom);
-  if (mode == 0)
-    Print("Mode: Orthogonal | Angle=%d,%d | Zoom=%.1f", (int)th, (int)ph, dim);
-  else if (mode == 1)
+  if (mode == 1)
     Print("Mode: Perspective | Angle=%d,%d | FOV=%d | Zoom=%.1f", (int)th,
           (int)ph, fov, dim);
   else
@@ -121,9 +118,7 @@ void drawHUD() {
   // View Controls
   yTop -= 15;
   glWindowPos2i(5, yTop);
-  if (mode == 0)
-    Print("  View: TAB)Modes  [/])Zoom  0)Reset  G)Axes  H)HUD  ESC)Exit");
-  else if (mode == 1)
+  if (mode == 1)
     Print("  View: TAB)Modes  +/-)FOV  [/])Zoom  0)Reset  G)Axes  H)HUD  "
           "ESC)Exit");
   else
@@ -387,7 +382,7 @@ void key(unsigned char ch, int x, int y) {
     showNormals = 1 - showNormals;
   //  Toggle projection mode (TAB key)
   else if (ch == 9) {
-    mode = (mode + 1) % 3; // cycle 0,1,2,0,1,...
+    mode = (mode == 1) ? 2 : 1; // Toggle between 1 and 2
 
     // When entering first-person, level the pitch and face toward -Z from +Z
     // position
@@ -404,18 +399,16 @@ void key(unsigned char ch, int x, int y) {
   }
   //  Change field of view angle
   else if (ch == '-' && fov > 1) {
-    if (mode > 0)
-      fov--;
+    fov--;
   } else if (ch == '+' && fov < 179) {
-    if (mode > 0)
-      fov++;
+    fov++;
   }
   //  Zoom in/out for orbit modes (adjust dim)
   else if (ch == '[' && dim < 100.0) {
-    if (mode < 2)
+    if (mode == 1)
       dim += 2.0;
   } else if (ch == ']' && dim > 5.0) {
-    if (mode < 2)
+    if (mode == 1)
       dim -= 2.0;
   }
   //  Update projection

@@ -6,7 +6,7 @@
 #include "view.h"
 
 /*
- *  Set projection matrix (orthogonal or perspective)
+ *  Set projection matrix (perspective)
  */
 void Project(int mode, int fov, double asp, double dim)
 {
@@ -24,9 +24,6 @@ void Project(int mode, int fov, double asp, double dim)
         const double far = 16 * dim;
         gluPerspective(fov, asp, near, far);
     }
-    else
-        //  Orthogonal projection - extend clipping to see full scene
-        glOrtho(-asp * dim, +asp * dim, -dim, +dim, -8 * dim, +8 * dim);
     //  Switch to manipulating the model matrix
     glMatrixMode(GL_MODELVIEW);
     //  Undo previous transformations
@@ -55,12 +52,6 @@ void setViewMode(int mode, double th, double ph, double dim, double px, double p
         double dirY = +Sin(ph);
         double dirZ = -Cos(th) * Cos(ph);
         gluLookAt(px, py, pz, px + dirX, py + dirY, pz + dirZ, 0, 1, 0);
-    }
-    else
-    {
-        // Orthogonal - rotate the world
-        glRotatef(ph, 1, 0, 0);
-        glRotatef(th, 0, 1, 0);
     }
 }
 
