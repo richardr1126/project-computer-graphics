@@ -42,6 +42,9 @@
 #define Cos(th) cos(3.14159265/180*(th))
 #define Sin(th) sin(3.14159265/180*(th))
 
+// sqrt
+#define Sqrt(x) sqrt(x)
+
 #ifdef __cplusplus
 extern "C" {
 #endif

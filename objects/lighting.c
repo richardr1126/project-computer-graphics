@@ -3,8 +3,8 @@
  *  Contains drawing functions for light representation
  */
 
-#include "../utils.h"
 #include "lighting.h"
+#include "../utils.h"
 
 /*
  *  Vertex on a unit sphere given angles (degrees)

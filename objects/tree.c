@@ -2,8 +2,8 @@
  *  Recursive tree object - implementation
  */
 
+ #include "tree.h"
 #include "../utils.h"
-#include "tree.h"
 
 /* Deterministic pseudo-random based on integer seed */
 static double rand01(unsigned int s)

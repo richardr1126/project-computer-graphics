@@ -3,7 +3,8 @@
  *
  *  Key Bindings:
  *  View Controls:
- *    TAB    Cycle view modes: Orthographic -> Perspective (orbit) -> First-Person
+ *    TAB    Cycle view modes: Orthographic -> Perspective (orbit) ->
+ * First-Person
  *    +/-    Change field of view (perspective modes)
  *    [/]    Zoom in/out (orbit modes only)
  *    0      Reset view (camera position/angles, FOV)
@@ -27,31 +28,35 @@
  *    n/N    Toggle normals debug lines
  */
 //  Include custom modules
+#include "objects/axes.h"
+#include "objects/bullseye.h"
+#include "objects/ground.h"
+#include "objects/lighting.h"
+#include "objects/tree.h"
 #include "utils.h"
-#include "objects.h"
 #include "view.h"
 
 //  Global state variables
 // View parameters
 double th = 0.0; //  Azimuth of view angle (degrees)
-double ph = 0.0;  //  Elevation of view angle (degrees)
-int axes = 0; //  Display axes
+double ph = 0.0; //  Elevation of view angle (degrees)
+int axes = 0;    //  Display axes
 int mode = 2; //  View mode: 0=Orthogonal, 1=Perspective (orbit), 2=First-Person
 int fov = 55; //  Field of view for perspective
-double asp = 1;   //  Aspect ratio
+double asp = 1;    //  Aspect ratio
 double dim = 25.0; //  World size for projection (increased to see full scene)
-int showHUD = 1;         //  HUD visibility toggle
+int showHUD = 1;   //  HUD visibility toggle
 //  First-person camera
-double px = 0, py = 0, pz = 17; // Position of the camera in world coords
-double moveStep = 7.0;          // Movement speed (units per second)
-int kW = 0, kA = 0, kS = 0, kD = 0;           // WASD movement keys
+double px = 0, py = 0, pz = 17;     // Position of the camera in world coords
+double moveStep = 7.0;              // Movement speed (units per second)
+int kW = 0, kA = 0, kS = 0, kD = 0; // WASD movement keys
 // Mouse look state (first-person)
-int mouseLook = 0;     // 1 while left button held for looking
-int lastX = 0, lastY = 0; // last mouse position
+int mouseLook = 0;              // 1 while left button held for looking
+int lastX = 0, lastY = 0;       // last mouse position
 double mouseSensitivity = 0.15; // degrees per pixel (lower for smoother feel)
 // Bullseye motion
 double zhTargets = 0;     // Animation angle for bullseye motion (degrees)
-int moveTargets  = 1;     // Toggle bullseye motion
+int moveTargets = 1;      // Toggle bullseye motion
 double targetRate = 90.0; // default target motion speed (degrees per second)
 //  Lighting
 int light = 1;           // Lighting toggle
@@ -62,486 +67,514 @@ double ylight = 0.0;     // Elevation of the light
 double ldist = 8.0;      // Light distance from origin in XZ plane
 int smooth = 1;          //  Shading mode: 1=Smooth, 0=Flat
 //  Debug helpers
-int showNormals = 0;       //  Toggle drawing of normal vectors
+int showNormals = 0; //  Toggle drawing of normal vectors
 //  Textures
-unsigned int groundTexture = 0; // Ground texture ID
-unsigned int woodTexture = 0;   // Wood texture ID for bullseyes
-unsigned int barkTexture = 0;   // Bark texture ID for trees
-unsigned int leafTexture = 0;   // Leaf texture ID for tree foliage
+unsigned int groundTexture = 0;   // Ground texture ID
+unsigned int mountainTexture = 0; // Mountain ring texture ID
+unsigned int woodTexture = 0;     // Wood texture ID for bullseyes
+unsigned int barkTexture = 0;     // Bark texture ID for trees
+unsigned int leafTexture = 0;     // Leaf texture ID for tree foliage
 
 // Trees animation (wind sway)
-double zhTrees = 0;             // Animation angle for tree sway (degrees)
+double zhTrees = 0; // Animation angle for tree sway (degrees)
 
 // FPS tracking
-double fps = 0.0;               // Current frames per second
-int frameCount = 0;             // Frame counter for FPS calculation
-double lastFPSTime = 0.0;       // Last time FPS was calculated
+double fps = 0.0;         // Current frames per second
+int frameCount = 0;       // Frame counter for FPS calculation
+double lastFPSTime = 0.0; // Last time FPS was calculated
 
 /*
  *  Draw HUD with controls and status information
  */
-void drawHUD()
-{
-    int windowHeight = glutGet(GLUT_WINDOW_HEIGHT);
-    int yBottom = 5;
-    
-    glColor3f(1, 1, 1);
-    
-    // Title and Mode
-    glWindowPos2i(5, yBottom);
-    if (mode == 0)
-        Print("Mode: Orthogonal | Angle=%d,%d | Zoom=%.1f", (int)th, (int)ph, dim);
-    else if (mode == 1)
-        Print("Mode: Perspective | Angle=%d,%d | FOV=%d | Zoom=%.1f", (int)th, (int)ph, fov, dim);
-    else
-        Print("Mode: First-Person | Angle=%d,%d | Pos=(%.1f,%.1f,%.1f) | FOV=%d", (int)th, (int)ph, px, py, pz, fov);
-    // Status line
-    yBottom += 15;
-    glWindowPos2i(5, yBottom);
-    Print("Light: %s | Elev=%.1f | Dist=%.1f | Axes=%s | Shade=%s",
-          light?"On":"Off", ylight, ldist,
-          axes?"On":"Off", smooth?"Smooth":"Flat");
-    // Debug status line
-    yBottom += 15;
-    glWindowPos2i(5, yBottom);
-    Print("Normals: %s | FPS: %.1f", showNormals?"On":"Off", fps);
-    
-    
-    // Controls section
-    int yTop = windowHeight - 15;
-    // Controls section header
-    glWindowPos2i(5, yTop);
-    Print("Controls:");
-    // View Controls
-    yTop -= 15;
-    glWindowPos2i(5, yTop);
-    if (mode == 0)
-        Print("  View: TAB)Modes  [/])Zoom  0)Reset  G)Axes  H)HUD  ESC)Exit");
-    else if (mode == 1)
-        Print("  View: TAB)Modes  +/-)FOV  [/])Zoom  0)Reset  G)Axes  H)HUD  ESC)Exit");
-    else
-        Print("  View: TAB)Modes  +/-)FOV  0)Reset  G)Axes  H)HUD  ESC)Exit");
-    // Camera Controls
-    yTop -= 15;
-    glWindowPos2i(5, yTop);
-    if (mode == 2)
-        Print("  Camera: Left-click drag)Look around  W/S)Forward/Back  A/D)Strafe Left/Right");
-    else
-        Print("  Camera: Arrows)Look around");
-    // Lighting Controls
-    yTop -= 15;
-    glWindowPos2i(5, yTop);
-    if (light) {
-        //Print("  Lighting: L)Toggle  1/2)Height  3/4)Distance  5)Pause  6)Manual  F)Smooth/Flat");
-        if (moveLight) {
-            Print("  Lighting: L)Toggle  1/2)Height  3/4)Distance  5)Pause  F)Smooth/Flat");
-        } else {
-            Print("  Lighting: L)Toggle  1/2)Height  3/4)Distance  5)Resume  6)Step  F)Smooth/Flat");
-        }
+void drawHUD() {
+  int windowHeight = glutGet(GLUT_WINDOW_HEIGHT);
+  int yBottom = 5;
+
+  glColor3f(1, 1, 1);
+
+  // Title and Mode
+  glWindowPos2i(5, yBottom);
+  if (mode == 0)
+    Print("Mode: Orthogonal | Angle=%d,%d | Zoom=%.1f", (int)th, (int)ph, dim);
+  else if (mode == 1)
+    Print("Mode: Perspective | Angle=%d,%d | FOV=%d | Zoom=%.1f", (int)th,
+          (int)ph, fov, dim);
+  else
+    Print("Mode: First-Person | Angle=%d,%d | Pos=(%.1f,%.1f,%.1f) | FOV=%d",
+          (int)th, (int)ph, px, py, pz, fov);
+  // Status line
+  yBottom += 15;
+  glWindowPos2i(5, yBottom);
+  Print("Light: %s | Elev=%.1f | Dist=%.1f | Axes=%s | Shade=%s",
+        light ? "On" : "Off", ylight, ldist, axes ? "On" : "Off",
+        smooth ? "Smooth" : "Flat");
+  // Debug status line
+  yBottom += 15;
+  glWindowPos2i(5, yBottom);
+  Print("Normals: %s | FPS: %.1f", showNormals ? "On" : "Off", fps);
+
+  // Controls section
+  int yTop = windowHeight - 15;
+  // Controls section header
+  glWindowPos2i(5, yTop);
+  Print("Controls:");
+  // View Controls
+  yTop -= 15;
+  glWindowPos2i(5, yTop);
+  if (mode == 0)
+    Print("  View: TAB)Modes  [/])Zoom  0)Reset  G)Axes  H)HUD  ESC)Exit");
+  else if (mode == 1)
+    Print("  View: TAB)Modes  +/-)FOV  [/])Zoom  0)Reset  G)Axes  H)HUD  "
+          "ESC)Exit");
+  else
+    Print("  View: TAB)Modes  +/-)FOV  0)Reset  G)Axes  H)HUD  ESC)Exit");
+  // Camera Controls
+  yTop -= 15;
+  glWindowPos2i(5, yTop);
+  if (mode == 2)
+    Print("  Camera: Left-click drag)Look around  W/S)Forward/Back  A/D)Strafe "
+          "Left/Right");
+  else
+    Print("  Camera: Arrows)Look around");
+  // Lighting Controls
+  yTop -= 15;
+  glWindowPos2i(5, yTop);
+  if (light) {
+    // Print("  Lighting: L)Toggle  1/2)Height  3/4)Distance  5)Pause  6)Manual
+    // F)Smooth/Flat");
+    if (moveLight) {
+      Print("  Lighting: L)Toggle  1/2)Height  3/4)Distance  5)Pause  "
+            "F)Smooth/Flat");
     } else {
-        Print("  Lighting: L)Toggle");
+      Print("  Lighting: L)Toggle  1/2)Height  3/4)Distance  5)Resume  6)Step  "
+            "F)Smooth/Flat");
     }
-    // Object Controls
-    yTop -= 15;
-    glWindowPos2i(5, yTop);
-    Print("  Object: P)Pause/Resume bullseye  N)Debug normals");
+  } else {
+    Print("  Lighting: L)Toggle");
+  }
+  // Object Controls
+  yTop -= 15;
+  glWindowPos2i(5, yTop);
+  Print("  Object: P)Pause/Resume bullseye  N)Debug normals");
 }
 
 /*
  *  Enable lighting with moving light position
  */
-void enableLighting()
-{
-    // Translate intensities to color vectors
-    float Ambient[]  = {0.2, 0.2, 0.2, 1.0};
-    float Diffuse[]  = {0.8, 0.8, 0.8, 1.0};
-    float Specular[] = {0.5, 0.5, 0.5, 1.0};
+void enableLighting() {
+  // Translate intensities to color vectors
+  float Ambient[] = {0.2, 0.2, 0.2, 1.0};
+  float Diffuse[] = {0.8, 0.8, 0.8, 1.0};
+  float Specular[] = {0.5, 0.5, 0.5, 1.0};
 
-    // Light position moving around Y axis with zh
-    float Position[] = {(ldist * Cos(zhLight)), ylight, (ldist * Sin(zhLight)), 1.0};
+  // Light position moving around Y axis with zh
+  float Position[] = {(ldist * Cos(zhLight)), ylight, (ldist * Sin(zhLight)),
+                      1.0};
 
-    // Draw light position as small white ball (unlit)
-    drawLightBall(Position[0], Position[1], Position[2], 0.15);
+  // Draw light position as small white ball (unlit)
+  drawLightBall(Position[0], Position[1], Position[2], 0.15);
 
-    // Enable lighting
-    glEnable(GL_LIGHTING);
-    glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE);
-    glEnable(GL_COLOR_MATERIAL);
+  // Enable lighting
+  glEnable(GL_LIGHTING);
+  glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE);
+  glEnable(GL_COLOR_MATERIAL);
 
-    // Some specular for highlights
-    float white[] = {1,1,1,1};
-    glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, white);
-    glMaterialf(GL_FRONT_AND_BACK, GL_SHININESS, 32.0);
+  // Some specular for highlights
+  float white[] = {1, 1, 1, 1};
+  glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, white);
+  glMaterialf(GL_FRONT_AND_BACK, GL_SHININESS, 32.0);
 
-    // Light0 parameters
-    glEnable(GL_LIGHT0);
-    glLightfv(GL_LIGHT0, GL_AMBIENT , Ambient);
-    glLightfv(GL_LIGHT0, GL_DIFFUSE , Diffuse);
-    glLightfv(GL_LIGHT0, GL_SPECULAR, Specular);
-    glLightfv(GL_LIGHT0, GL_POSITION, Position);
+  // Light0 parameters
+  glEnable(GL_LIGHT0);
+  glLightfv(GL_LIGHT0, GL_AMBIENT, Ambient);
+  glLightfv(GL_LIGHT0, GL_DIFFUSE, Diffuse);
+  glLightfv(GL_LIGHT0, GL_SPECULAR, Specular);
+  glLightfv(GL_LIGHT0, GL_POSITION, Position);
 }
 
 /*
  *  OpenGL (GLUT) calls this routine to display the scene
  */
-void display()
-{
-    //  Erase the window and the depth buffer
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+void display() {
+  //  Erase the window and the depth buffer
+  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    //  Undo previous transformations
-    glLoadIdentity();
-    //  Set camera/view
-    setViewMode(mode, th, ph, dim, px, py, pz);
+  //  Undo previous transformations
+  glLoadIdentity();
+  //  Set camera/view
+  setViewMode(mode, th, ph, dim, px, py, pz);
 
-    //  Enable Z-buffering
-    glEnable(GL_DEPTH_TEST);
-    //  Flat or smooth shading
-    glShadeModel(smooth ? GL_SMOOTH : GL_FLAT);
-    //  Enable back face culling
-    // glEnable(GL_CULL_FACE);
+  //  Enable Z-buffering
+  glEnable(GL_DEPTH_TEST);
+  //  Flat or smooth shading
+  glShadeModel(smooth ? GL_SMOOTH : GL_FLAT);
+  //  Enable back face culling
+  // glEnable(GL_CULL_FACE);
 
-    // Lighting setup
-    if (light) enableLighting();
-    else glDisable(GL_LIGHTING);
+  // Lighting setup
+  if (light)
+    enableLighting();
+  else
+    glDisable(GL_LIGHTING);
 
-    // ===== OPAQUE PASS: Draw all opaque objects first =====
-    glDepthMask(GL_TRUE);
-    glDisable(GL_BLEND);
-    
-    // Draw bullseyes (animated)
-    // showNormals controls whether normal vectors are drawn for debugging
-    drawBullseyeScene(zhTargets, showNormals, woodTexture);
+  // ===== OPAQUE PASS: Draw all opaque objects first =====
+  glDepthMask(GL_TRUE);
+  glDisable(GL_BLEND);
 
-    // Draw ground terrain (steepness, size, groundY, texture, showNormals)
-    drawGround(0.5, 45.0, -3.0, groundTexture, showNormals);
-    
-    // Draw tree trunks and branches (opaque, uses bark texture)
-    glEnable(GL_CULL_FACE);
-    glFrontFace(GL_CW);   // Tree geometry winds clockwise; treat CW as front
-    drawTreeScene(zhTrees, showNormals, barkTexture, 0);
-    glFrontFace(GL_CCW);  // Restore default front-face winding
-    glDisable(GL_CULL_FACE);
+  // Draw bullseyes (animated)
+  // showNormals controls whether normal vectors are drawn for debugging
+  drawBullseyeScene(zhTargets, showNormals, woodTexture);
 
-    // ===== TRANSPARENT PASS: Draw all transparent objects last =====
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glDepthMask(GL_FALSE); // CRITICAL: disable depth writing for transparency
-    
-    // Draw tree leaves (transparent)
-    glEnable(GL_TEXTURE_2D);
-    glBindTexture(GL_TEXTURE_2D, leafTexture);
-    glEnable(GL_ALPHA_TEST);
-    glAlphaFunc(GL_GREATER, 0.1f);
-    drawTreeLeaves(zhTrees, leafTexture);
-    glDisable(GL_ALPHA_TEST);
-    glDisable(GL_TEXTURE_2D);
-    
-    // Restore render state
-    glDepthMask(GL_TRUE);
-    glDisable(GL_BLEND);
-    
-    //  Start white coloring
-    glColor3f(1, 1, 1);
-    glDisable(GL_LIGHTING); // Disable lighting for HUD and axes
-    if (axes) drawAxes(5.0); // Draw axes
-    if (showHUD) drawHUD(); // Draw HUD
+  // Enable back-face culling for terrain to improve performance
+  glEnable(GL_CULL_FACE);
 
-    //  Present frame
-    ErrCheck("display");
-    //glFlush();
-    glutSwapBuffers();
+  // Draw ground terrain (steepness, size, groundY, texture, showNormals)
+  const double groundSize = 45.0;
+  const double groundY = -3.0;
+  drawGround(0.5, groundSize, groundY, groundTexture, showNormals);
+
+  // Draw vast mountain ring surrounding the ground island (bowl-like)
+  // innerR should match ground size for a seamless join
+  // Overlap mountain ring slightly with ground to avoid gap
+  const double overlap = 5.0; // increase overlap to fully seal
+  drawMountainRing(groundSize - overlap, 200.0, groundY, mountainTexture,
+                   showNormals, 32.0);
+  
+  glDisable(GL_CULL_FACE);
+
+  // Draw tree trunks and branches (opaque, uses bark texture)
+  glEnable(GL_CULL_FACE);
+  glFrontFace(GL_CW); // Tree geometry winds clockwise; treat CW as front
+  drawTreeScene(zhTrees, showNormals, barkTexture, 0);
+  glFrontFace(GL_CCW); // Restore default front-face winding
+  glDisable(GL_CULL_FACE);
+
+  // ===== TRANSPARENT PASS: Draw all transparent objects last =====
+  glEnable(GL_BLEND);
+  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+  glDepthMask(GL_FALSE); // CRITICAL: disable depth writing for transparency
+
+  // Draw tree leaves (transparent)
+  glEnable(GL_TEXTURE_2D);
+  glBindTexture(GL_TEXTURE_2D, leafTexture);
+  glEnable(GL_ALPHA_TEST);
+  glAlphaFunc(GL_GREATER, 0.1f);
+  drawTreeLeaves(zhTrees, leafTexture);
+  glDisable(GL_ALPHA_TEST);
+  glDisable(GL_TEXTURE_2D);
+
+  // Restore render state
+  glDepthMask(GL_TRUE);
+  glDisable(GL_BLEND);
+
+  //  Start white coloring
+  glColor3f(1, 1, 1);
+  glDisable(GL_LIGHTING); // Disable lighting for HUD and axes
+  if (axes)
+    drawAxes(5.0); // Draw axes
+  if (showHUD)
+    drawHUD(); // Draw HUD
+
+  //  Present frame
+  ErrCheck("display");
+  // glFlush();
+  glutSwapBuffers();
 }
 
 /*
  *  GLUT calls this routine when an arrow key is pressed (key down)
  */
-void specialDown(int key, int x, int y)
-{
-    if (mode != 2)
-    {
-        // Other modes: step angles immediately (legacy behavior)
-        if (key == GLUT_KEY_RIGHT)
-            th += 5.0;
-        else if (key == GLUT_KEY_LEFT)
-            th -= 5.0;
-        else if (key == GLUT_KEY_UP)
-            ph += 5.0;
-        else if (key == GLUT_KEY_DOWN)
-            ph -= 5.0;
-        // wrap angles
-        if (th >= 360.0) th -= 360.0; else if (th < 0.0) th += 360.0;
-        if (ph >= 360.0) ph -= 360.0; else if (ph < 0.0) ph += 360.0;
-        //  Reproject and redraw
-        Project(mode, fov, asp, dim);
-        glutPostRedisplay();
-    }
+void specialDown(int key, int x, int y) {
+  if (mode != 2) {
+    // Other modes: step angles immediately (legacy behavior)
+    if (key == GLUT_KEY_RIGHT)
+      th += 5.0;
+    else if (key == GLUT_KEY_LEFT)
+      th -= 5.0;
+    else if (key == GLUT_KEY_UP)
+      ph += 5.0;
+    else if (key == GLUT_KEY_DOWN)
+      ph -= 5.0;
+    // wrap angles
+    if (th >= 360.0)
+      th -= 360.0;
+    else if (th < 0.0)
+      th += 360.0;
+    if (ph >= 360.0)
+      ph -= 360.0;
+    else if (ph < 0.0)
+      ph += 360.0;
+    //  Reproject and redraw
+    Project(mode, fov, asp, dim);
+    glutPostRedisplay();
+  }
 }
 
 /*
  *  GLUT calls this routine when a key is pressed
  */
-void key(unsigned char ch, int x, int y)
-{
-    //  Exit on ESC
-    if (ch == 27)
-        exit(0);
-    //  Reset view angle
-    else if (ch == '0')
-    {
-        px = 0;
-        py = 0;
-        pz = 17;
-        fov = 55;
-        dim = 25.0;
-        // Reset view angles depending on mode
-        if (mode == 2) {
-            th = 0;
-            ph = 0;
-        } else {
-            th = -45;
-            ph = 45;
-        }
+void key(unsigned char ch, int x, int y) {
+  //  Exit on ESC
+  if (ch == 27)
+    exit(0);
+  //  Reset view angle
+  else if (ch == '0') {
+    px = 0;
+    py = 0;
+    pz = 17;
+    fov = 55;
+    dim = 25.0;
+    // Reset view angles depending on mode
+    if (mode == 2) {
+      th = 0;
+      ph = 0;
+    } else {
+      th = -45;
+      ph = 45;
     }
-    //  Movement keys (first-person only): set pressed flags for smooth motion
-    else if (mode == 2 && (ch == 'w' || ch == 'W' || ch == 'a' || ch == 'A' || ch == 's' || ch == 'S' || ch == 'd' || ch == 'D'))
-    {
-        if (ch == 'w' || ch == 'W') kW = 1;
-        else if (ch == 's' || ch == 'S') kS = 1;
-        else if (ch == 'a' || ch == 'A') kA = 1;
-        else if (ch == 'd' || ch == 'D') kD = 1;
-        return; // no further processing for these keys on key-down
+  }
+  //  Movement keys (first-person only): set pressed flags for smooth motion
+  else if (mode == 2 && (ch == 'w' || ch == 'W' || ch == 'a' || ch == 'A' ||
+                         ch == 's' || ch == 'S' || ch == 'd' || ch == 'D')) {
+    if (ch == 'w' || ch == 'W')
+      kW = 1;
+    else if (ch == 's' || ch == 'S')
+      kS = 1;
+    else if (ch == 'a' || ch == 'A')
+      kA = 1;
+    else if (ch == 'd' || ch == 'D')
+      kD = 1;
+    return; // no further processing for these keys on key-down
+  }
+  //  Toggle axes
+  else if (ch == 'g' || ch == 'G')
+    axes = 1 - axes;
+  //  Toggle HUD
+  else if (ch == 'h' || ch == 'H')
+    showHUD = 1 - showHUD;
+  //  Toggle lighting
+  else if (ch == 'l' || ch == 'L')
+    light = 1 - light;
+  //  Light elevation (1=raise, 2=lower)
+  else if (ch == '1')
+    ylight += 0.1;
+  else if (ch == '2')
+    ylight -= 0.1;
+  //  Light distance (3=increase, 4=decrease)
+  else if (ch == '3') {
+    ldist += 0.5;
+    if (ldist > 50.0)
+      ldist = 50.0;
+  } else if (ch == '4') {
+    ldist -= 0.5;
+    if (ldist < 0.5)
+      ldist = 0.5;
+  }
+  //  Toggle light rotation
+  else if (ch == '5')
+    moveLight = 1 - moveLight;
+  //  Manually step light rotation when paused
+  else if (ch == '6' && !moveLight)
+    zhLight = fmod(zhLight + 5.0, 360.0);
+  //  Toggle smooth/flat shading
+  else if (ch == 'f' || ch == 'F')
+    smooth = 1 - smooth;
+  //  Pause/Resume bullseye motion
+  else if (ch == 'p' || ch == 'P')
+    moveTargets = 1 - moveTargets;
+  //  Toggle normals debug
+  else if (ch == 'n' || ch == 'N')
+    showNormals = 1 - showNormals;
+  //  Toggle projection mode (TAB key)
+  else if (ch == 9) {
+    mode = (mode + 1) % 3; // cycle 0,1,2,0,1,...
+
+    // When entering first-person, level the pitch and face toward -Z from +Z
+    // position
+    if (mode == 2) {
+      th = 0.0; // th=0 faces -Z in this convention
+      ph = 0.0; // look straight ahead
+    } else {
+      // Reset to default orbit view angles when leaving FP mode
+      th = -45.0;
+      ph = 45.0;
+      // Ensure any mouse-look drag is cleared when leaving FP
+      mouseLook = 0;
     }
-    //  Toggle axes
-    else if (ch == 'g' || ch == 'G')
-        axes = 1 - axes;
-    //  Toggle HUD
-    else if (ch == 'h' || ch == 'H')
-        showHUD = 1 - showHUD;
-    //  Toggle lighting
-    else if (ch == 'l' || ch == 'L')
-        light = 1 - light;
-    //  Light elevation (1=raise, 2=lower)
-    else if (ch == '1')
-        ylight += 0.1;
-    else if (ch == '2')
-        ylight -= 0.1;
-    //  Light distance (3=increase, 4=decrease)
-    else if (ch == '3')
-    {
-        ldist += 0.5;
-        if (ldist > 50.0) ldist = 50.0;
-    }
-    else if (ch == '4')
-    {
-        ldist -= 0.5;
-        if (ldist < 0.5) ldist = 0.5;
-    }
-    //  Toggle light rotation
-    else if (ch == '5')
-        moveLight = 1 - moveLight;
-    //  Manually step light rotation when paused
-    else if (ch == '6' && !moveLight)
-        zhLight = fmod(zhLight + 5.0, 360.0);
-    //  Toggle smooth/flat shading
-    else if (ch == 'f' || ch == 'F')
-        smooth = 1 - smooth;
-    //  Pause/Resume bullseye motion
-    else if (ch == 'p' || ch == 'P')
-        moveTargets = 1 - moveTargets;
-    //  Toggle normals debug
-    else if (ch == 'n' || ch == 'N')
-        showNormals = 1 - showNormals;
-    //  Toggle projection mode (TAB key)
-    else if (ch == 9)
-    {
-        mode = (mode + 1) % 3; // cycle 0,1,2,0,1,...
-        
-        // When entering first-person, level the pitch and face toward -Z from +Z position
-        if (mode == 2)
-        {
-            th = 0.0; // th=0 faces -Z in this convention
-            ph = 0.0; // look straight ahead
-        } else {
-            // Reset to default orbit view angles when leaving FP mode
-            th = -45.0;
-            ph = 45.0;
-            // Ensure any mouse-look drag is cleared when leaving FP
-            mouseLook = 0;
-        }
-    }
-    //  Change field of view angle
-    else if (ch == '-' && fov > 1) {
-        if (mode > 0) fov--;
-    } else if (ch == '+' && fov < 179) {
-        if (mode > 0) fov++;
-    }
-    //  Zoom in/out for orbit modes (adjust dim)
-    else if (ch == '[' && dim < 100.0) {
-        if (mode < 2) dim += 2.0;
-    } else if (ch == ']' && dim > 5.0) {
-        if (mode < 2) dim -= 2.0;
-    }
-    //  Update projection
-    Project(mode, fov, asp, dim);
-    //  Tell GLUT it is necessary to redisplay the scene
-    glutPostRedisplay();
+  }
+  //  Change field of view angle
+  else if (ch == '-' && fov > 1) {
+    if (mode > 0)
+      fov--;
+  } else if (ch == '+' && fov < 179) {
+    if (mode > 0)
+      fov++;
+  }
+  //  Zoom in/out for orbit modes (adjust dim)
+  else if (ch == '[' && dim < 100.0) {
+    if (mode < 2)
+      dim += 2.0;
+  } else if (ch == ']' && dim > 5.0) {
+    if (mode < 2)
+      dim -= 2.0;
+  }
+  //  Update projection
+  Project(mode, fov, asp, dim);
+  //  Tell GLUT it is necessary to redisplay the scene
+  glutPostRedisplay();
 }
 
 /*
- *  GLUT calls this routine when a normal key is released (to clear movement flags)
+ *  GLUT calls this routine when a normal key is released (to clear movement
+ * flags)
  */
-void keyUp(unsigned char ch, int x, int y)
-{
-    if (mode == 2)
-    {
-        if (ch == 'w' || ch == 'W') kW = 0;
-        else if (ch == 's' || ch == 'S') kS = 0;
-        else if (ch == 'a' || ch == 'A') kA = 0;
-        else if (ch == 'd' || ch == 'D') kD = 0;
-    }
+void keyUp(unsigned char ch, int x, int y) {
+  if (mode == 2) {
+    if (ch == 'w' || ch == 'W')
+      kW = 0;
+    else if (ch == 's' || ch == 'S')
+      kS = 0;
+    else if (ch == 'a' || ch == 'A')
+      kA = 0;
+    else if (ch == 'd' || ch == 'D')
+      kD = 0;
+  }
 }
 
 /*
  *  GLUT calls this routine when the window is resized
  */
-void reshape(int width, int height)
-{
-    //  Ratio of the width to the height of the window
-    asp = (height > 0) ? (double)width / height : 1;
-    //  Set the viewport to the entire window
-    glViewport(0, 0, width, height);
-    //  Set projection
-    Project(mode, fov, asp, dim);
+void reshape(int width, int height) {
+  //  Ratio of the width to the height of the window
+  asp = (height > 0) ? (double)width / height : 1;
+  //  Set the viewport to the entire window
+  glViewport(0, 0, width, height);
+  //  Set projection
+  Project(mode, fov, asp, dim);
 }
 
 /*
  *  GLUT calls this routine when there is nothing else to do
  *  Animate side-to-side motion by advancing zh
  */
-void idle()
-{
-    static double lastT = 0.0;
-    double t = glutGet(GLUT_ELAPSED_TIME) / 1000.0;
-    if (lastT == 0.0) {
-        lastT = t;
-        lastFPSTime = t;
-    }
-    double dt = t - lastT;
+void idle() {
+  static double lastT = 0.0;
+  double t = glutGet(GLUT_ELAPSED_TIME) / 1000.0;
+  if (lastT == 0.0) {
     lastT = t;
+    lastFPSTime = t;
+  }
+  double dt = t - lastT;
+  lastT = t;
 
-    // Calculate FPS every 0.5 seconds
-    frameCount++;
-    if (t - lastFPSTime >= 0.5) {
-        fps = frameCount / (t - lastFPSTime);
-        frameCount = 0;
-        lastFPSTime = t;
-    }
+  // Calculate FPS every 0.5 seconds
+  frameCount++;
+  if (t - lastFPSTime >= 0.5) {
+    fps = frameCount / (t - lastFPSTime);
+    frameCount = 0;
+    lastFPSTime = t;
+  }
 
-    // First-person: update movement from WASD continuously
-    if (mode == 2)
-    {
-        fpUpdateMove(th, kW, kS, kA, kD, moveStep, dt, &px, &pz);
-    }
+  // First-person: update movement from WASD continuously
+  if (mode == 2) {
+    fpUpdateMove(th, kW, kS, kA, kD, moveStep, dt, &px, &pz);
+  }
 
-    // Light moves only when enabled
-    if (moveLight)
-        zhLight = fmod(zhLight + lightRate * dt, 360.0);
-    // Bullseyes move only when enabled
-    if (moveTargets)
-        zhTargets = fmod(zhTargets + targetRate * dt, 360.0);
-    // Trees sway continuously (gentle)
-    zhTrees = fmod(zhTrees + 25.0 * dt, 360.0);
-    glutPostRedisplay();
+  // Light moves only when enabled
+  if (moveLight)
+    zhLight = fmod(zhLight + lightRate * dt, 360.0);
+  // Bullseyes move only when enabled
+  if (moveTargets)
+    zhTargets = fmod(zhTargets + targetRate * dt, 360.0);
+  // Trees sway continuously (gentle)
+  zhTrees = fmod(zhTrees + 25.0 * dt, 360.0);
+  glutPostRedisplay();
 }
 
 /*
  *  Mouse handlers for first-person look (click-drag to look)
  */
-void mouse(int button, int state, int x, int y)
-{
-    if (mode != 2) return;
-    if (button == GLUT_LEFT_BUTTON)
-    {
-        if (state == GLUT_DOWN)
-        {
-            mouseLook = 1;
-            lastX = x;
-            lastY = y;
-        }
-        else if (state == GLUT_UP)
-        {
-            mouseLook = 0;
-        }
-        glutPostRedisplay();
+void mouse(int button, int state, int x, int y) {
+  if (mode != 2)
+    return;
+  if (button == GLUT_LEFT_BUTTON) {
+    if (state == GLUT_DOWN) {
+      mouseLook = 1;
+      lastX = x;
+      lastY = y;
+    } else if (state == GLUT_UP) {
+      mouseLook = 0;
     }
+    glutPostRedisplay();
+  }
 }
 
-void motion(int x, int y)
-{
-    if (mode != 2 || !mouseLook) return;
-    int dx = x - lastX;
-    int dy = y - lastY;
-    lastX = x;
-    lastY = y;
-    // Update yaw/pitch from mouse delta
-    th += dx * mouseSensitivity;
-    if (th >= 360.0) th -= 360.0; else if (th < 0.0) th += 360.0;
-    ph -= dy * mouseSensitivity;
-    if (ph > 89.0) ph = 89.0; else if (ph < -89.0) ph = -89.0;
-    glutPostRedisplay();
+void motion(int x, int y) {
+  if (mode != 2 || !mouseLook)
+    return;
+  int dx = x - lastX;
+  int dy = y - lastY;
+  lastX = x;
+  lastY = y;
+  // Update yaw/pitch from mouse delta
+  th += dx * mouseSensitivity;
+  if (th >= 360.0)
+    th -= 360.0;
+  else if (th < 0.0)
+    th += 360.0;
+  ph -= dy * mouseSensitivity;
+  if (ph > 89.0)
+    ph = 89.0;
+  else if (ph < -89.0)
+    ph = -89.0;
+  glutPostRedisplay();
 }
 
 /*
  *  Start up GLUT and tell it what to do
  */
-int main(int argc, char *argv[])
-{
-    //  Initialize GLUT and process user parameters
-    glutInit(&argc, argv);
-    //  Request double buffered, true color window with Z buffering
-    glutInitDisplayMode(GLUT_RGB | GLUT_DEPTH | GLUT_DOUBLE);
-    //  Request 1000 x 700 pixel window
-    glutInitWindowSize(1000, 700);
-    //  Create the window
-    glutCreateWindow("Final Project: Richard Roberson");
+int main(int argc, char *argv[]) {
+  //  Initialize GLUT and process user parameters
+  glutInit(&argc, argv);
+  //  Request double buffered, true color window with Z buffering
+  glutInitDisplayMode(GLUT_RGB | GLUT_DEPTH | GLUT_DOUBLE);
+  //  Request 1000 x 700 pixel window
+  glutInitWindowSize(1000, 700);
+  //  Create the window
+  glutCreateWindow("Final Project: Richard Roberson");
 #ifdef USEGLEW
-    //  Initialize GLEW
-    if (glewInit() != GLEW_OK)
-        Fatal("Error initializing GLEW\n");
+  //  Initialize GLEW
+  if (glewInit() != GLEW_OK)
+    Fatal("Error initializing GLEW\n");
 #endif
-    //  Load ground texture
-    groundTexture = LoadTexBMP("textures/ground.bmp");
-    //  Load wood texture for bullseyes
-    woodTexture = LoadTexBMP("textures/wood.bmp");
-    //  Load bark texture for trees
-    barkTexture = LoadTexBMP("textures/bark.bmp");
-    glBindTexture(GL_TEXTURE_2D, barkTexture);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
-    //  Load leaf texture with proper alpha settings
-    leafTexture = LoadTexBMP("textures/leaf.bmp");
-    glBindTexture(GL_TEXTURE_2D, leafTexture);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    //  Tell GLUT to call "display" when the scene should be drawn
-    glutDisplayFunc(display);
-    //  Tell GLUT to call "idle" when there is nothing else to do (animate)
-    glutIdleFunc(idle);
-    //  Tell GLUT to call "reshape" when the window is resized
-    glutReshapeFunc(reshape);
-    //  Tell GLUT to call arrow key handler (down); arrows are used in non-FP modes only
-    glutSpecialFunc(specialDown);
-    // No specialUp needed
-    //  Tell GLUT to call "key" when a key is pressed
-    glutKeyboardFunc(key);
-    //  Tell GLUT to call keyUp when a key is released (for WASD)
-    glutKeyboardUpFunc(keyUp);
-    //  Mouse look in first-person
-    glutMouseFunc(mouse);
-    glutMotionFunc(motion);
-    //  Pass control to GLUT so it can interact with the user
-    glutMainLoop();
-    return 0;
+  //  Load ground texture
+  groundTexture = LoadTexBMP("textures/ground.bmp");
+  //  Load mountain texture (surrounding ring)
+  mountainTexture = LoadTexBMP("textures/ground2.bmp");
+  //  Load wood texture for bullseyes
+  woodTexture = LoadTexBMP("textures/wood.bmp");
+  //  Load bark texture for trees
+  barkTexture = LoadTexBMP("textures/bark.bmp");
+  //  Load leaf texture with proper alpha settings
+  leafTexture = LoadTexBMP("textures/leaf.bmp");
+  //  Tell GLUT to call "display" when the scene should be drawn
+  glutDisplayFunc(display);
+  //  Tell GLUT to call "idle" when there is nothing else to do (animate)
+  glutIdleFunc(idle);
+  //  Tell GLUT to call "reshape" when the window is resized
+  glutReshapeFunc(reshape);
+  //  Tell GLUT to call arrow key handler (down); arrows are used in non-FP
+  //  modes only
+  glutSpecialFunc(specialDown);
+  // No specialUp needed
+  //  Tell GLUT to call "key" when a key is pressed
+  glutKeyboardFunc(key);
+  //  Tell GLUT to call keyUp when a key is released (for WASD)
+  glutKeyboardUpFunc(keyUp);
+  //  Mouse look in first-person
+  glutMouseFunc(mouse);
+  glutMotionFunc(motion);
+  //  Pass control to GLUT so it can interact with the user
+  glutMainLoop();
+  return 0;
 }

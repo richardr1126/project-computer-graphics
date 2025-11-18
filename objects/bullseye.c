@@ -3,8 +3,8 @@
  *  Contains drawing functions for bullseye targets
  */
 
-#include "../utils.h"
 #include "bullseye.h"
+#include "../utils.h"
 
 /*
  *  Apply translation and orientation for a bullseye given Bullseye struct

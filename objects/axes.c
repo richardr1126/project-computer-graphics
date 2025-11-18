@@ -3,8 +3,8 @@
  *  Contains drawing functions for coordinate axes
  */
 
-#include "../utils.h"
 #include "axes.h"
+#include "../utils.h"
 
 /*
  *  Draw axes
