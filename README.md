@@ -11,10 +11,14 @@ Implements texture mapping on a 3D scene with lighting. Features a textured terr
 - **Lighting**: Animated light source (rendered as bright sphere) with ambient, diffuse, and specular components. Supports smooth and flat shading modes.
   - **Light Controls**: Adjust light height and distance, pause/resume rotation, manual rotation, and smooth/flat shading toggle.
   - **Normals Debugging**: Toggle display of normals for all objects.
+- **Archery Mechanics**:
+  - **Shooting**: First-person shooting with charge-up mechanic. Hold right-click to charge power (visualized by dynamic crosshair), release to shoot.
+  - **Physics**: Arrows follow physics trajectories with gravity.
 - **Objects**:
   - **Ground**: Textured ground terrain with height variations.
   - **Trees**: Procedurally generated trees with textured trunks and alpha-blended leaves.
   - **Bullseyes**: Three textured bullseye targets with animated motion.
+  - **Arrow**: Physics-based projectile that can be shot from the camera position.
   - **Light Sphere**: Represents the light source in the scene.
 
 #### Debugging features
@@ -39,10 +43,11 @@ zip -r project.zip .
 | h/H    | Toggle HUD |
 | ESC    | Exit |
 
-### Camera Controls
+### Camera & Interaction Controls
 | Key    | Action |
 |--------|--------|
-| mouse drag | Look around in first-person (click and drag left mouse to yaw/pitch; works while moving) |
+| Left-click drag | Look around in first-person (click and drag left mouse to yaw/pitch; works while moving) |
+| Right-click | Hold to charge shot (crosshair turns red), release to fire arrow |
 | arrows | Look around in perspective (orbit) mode |
 | w/s    | Move forward/backward (first-person mode only) |
 | a/d    | Strafe left/right (first-person mode only) |

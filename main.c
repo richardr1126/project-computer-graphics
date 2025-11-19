@@ -11,10 +11,11 @@
  *    h/H    Toggle HUD
  *    ESC    Exit
  *  Camera Controls:
- *    Mouse drag Look around (first-person mode)
- *    arrows     Look around (perspective orbit mode)
- *    w/s        Move forward/backward (first-person mode only)
- *    a/d        Strafe left/right (first-person mode only)
+ *    Left-click drag Look around (first-person mode)
+ *    Right-click     Hold to charge, release to shoot arrow
+ *    arrows          Look around (perspective orbit mode)
+ *    w/s             Move forward/backward (first-person mode only)
+ *    a/d             Strafe left/right (first-person mode only)
  *  Lighting Controls:
  *    l/L    Toggle lighting on/off
  *    1/2    Raise/lower light height
@@ -38,11 +39,11 @@
 
 //  Global state variables
 // View parameters
-double th = 0.0; //  Azimuth of view angle (degrees)
-double ph = 0.0; //  Elevation of view angle (degrees)
-int axes = 0;    //  Display axes
-int mode = 2; //  View mode: 1=Perspective (orbit), 2=First-Person
-int fov = 55; //  Field of view for perspective
+double th = 0.0;   //  Azimuth of view angle (degrees)
+double ph = 0.0;   //  Elevation of view angle (degrees)
+int axes = 0;      //  Display axes
+int mode = 2;      //  View mode: 1=Perspective (orbit), 2=First-Person
+int fov = 55;      //  Field of view for perspective
 double asp = 1;    //  Aspect ratio
 double dim = 25.0; //  World size for projection (increased to see full scene)
 int showHUD = 1;   //  HUD visibility toggle
@@ -77,6 +78,10 @@ unsigned int leafTexture = 0;     // Leaf texture ID for tree foliage
 
 // Trees animation (wind sway)
 double zhTrees = 0; // Animation angle for tree sway (degrees)
+
+// Arrow state
+Arrow arrow = {0, 5, 0, 1, 0, 0, 0, 0, 0, 1.0, 0}; // Initial static arrow
+double chargeStartTime = 0; // Time when right click started
 
 // FPS tracking
 double fps = 0.0;         // Current frames per second
@@ -128,16 +133,13 @@ void drawHUD() {
   yTop -= 15;
   glWindowPos2i(5, yTop);
   if (mode == 2)
-    Print("  Camera: Left-click drag)Look around  W/S)Forward/Back  A/D)Strafe "
-          "Left/Right");
+    Print("  Camera: L-Click)Look  R-Click)Charge/Shoot  W/S)Move  A/D)Strafe");
   else
     Print("  Camera: Arrows)Look around");
   // Lighting Controls
   yTop -= 15;
   glWindowPos2i(5, yTop);
   if (light) {
-    // Print("  Lighting: L)Toggle  1/2)Height  3/4)Distance  5)Pause  6)Manual
-    // F)Smooth/Flat");
     if (moveLight) {
       Print("  Lighting: L)Toggle  1/2)Height  3/4)Distance  5)Pause  "
             "F)Smooth/Flat");
@@ -152,6 +154,66 @@ void drawHUD() {
   yTop -= 15;
   glWindowPos2i(5, yTop);
   Print("  Object: P)Pause/Resume bullseye  N)Debug normals");
+}
+
+/*
+ *  Draw dynamic crosshair
+ */
+void drawCrosshair() {
+  int w = glutGet(GLUT_WINDOW_WIDTH);
+  int h = glutGet(GLUT_WINDOW_HEIGHT);
+  int cx = w / 2;
+  int cy = h / 2;
+
+  // Calculate charge
+  double charge = 0.0;
+  if (chargeStartTime > 0) {
+    double now = glutGet(GLUT_ELAPSED_TIME) / 1000.0;
+    double duration = now - chargeStartTime;
+    if (duration > 1.0)
+      duration = 1.0;
+    charge = duration;
+  }
+
+  // Base size and thickness
+  double size = 10.0 * (1.0 + charge);
+  double thickness = 1.0 + (charge * 2.0);
+
+  // Draw crosshair
+  glLineWidth(thickness);
+  glColor3f(1.0, 1.0 - charge, 1.0 - charge); // White to Red
+
+  // Use 2D orthographic projection
+  glMatrixMode(GL_PROJECTION);
+  glPushMatrix();
+  glLoadIdentity();
+  glOrtho(0, w, 0, h, -1, 1);
+  glMatrixMode(GL_MODELVIEW);
+  glPushMatrix();
+  glLoadIdentity();
+
+  glDisable(GL_LIGHTING);
+  glDisable(GL_DEPTH_TEST);
+
+  glBegin(GL_LINES);
+  // Horizontal
+  glVertex2d(cx - size, cy);
+  glVertex2d(cx + size, cy);
+  // Vertical
+  glVertex2d(cx, cy - size);
+  glVertex2d(cx, cy + size);
+  glEnd();
+
+  // Restore state
+  glEnable(GL_DEPTH_TEST);
+  glEnable(GL_LIGHTING);
+
+  glPopMatrix();
+  glMatrixMode(GL_PROJECTION);
+  glPopMatrix();
+  glMatrixMode(GL_MODELVIEW);
+
+  glLineWidth(1.0);
 }
 
 /*
@@ -235,7 +297,7 @@ void display() {
   const double overlap = 5.0; // increase overlap to fully seal
   drawMountainRing(groundSize - overlap, 200.0, groundY, mountainTexture,
                    showNormals, 32.0);
-  
+
   glDisable(GL_CULL_FACE);
 
   // Draw tree trunks and branches (opaque, uses bark texture)
@@ -245,8 +307,7 @@ void display() {
   glFrontFace(GL_CCW); // Restore default front-face winding
   glDisable(GL_CULL_FACE);
 
-  // Draw Arrow (static for now)
-  Arrow arrow = {0, 5, 0, 1, 0, 0, 1.0};
+  // Draw Arrow
   drawArrow(&arrow, showNormals);
 
   // ===== TRANSPARENT PASS: Draw all transparent objects last =====
@@ -274,6 +335,10 @@ void display() {
     drawAxes(5.0); // Draw axes
   if (showHUD)
     drawHUD(); // Draw HUD
+
+  // Draw Crosshair in First-Person mode
+  if (mode == 2)
+    drawCrosshair();
 
   //  Present frame
   ErrCheck("display");
@@ -486,6 +551,10 @@ void idle() {
     zhTargets = fmod(zhTargets + targetRate * dt, 360.0);
   // Trees sway continuously (gentle)
   zhTrees = fmod(zhTrees + 25.0 * dt, 360.0);
+
+  // Update arrow physics
+  updateArrow(&arrow, dt);
+
   glutPostRedisplay();
 }
 
@@ -504,6 +573,34 @@ void mouse(int button, int state, int x, int y) {
       mouseLook = 0;
     }
     glutPostRedisplay();
+  } else if (button == GLUT_RIGHT_BUTTON) {
+    // Right click to shoot (Charge mechanic)
+    if (state == GLUT_DOWN) {
+      // Start charging
+      chargeStartTime = glutGet(GLUT_ELAPSED_TIME) / 1000.0;
+    } else if (state == GLUT_UP) {
+      // Release to shoot
+      double now = glutGet(GLUT_ELAPSED_TIME) / 1000.0;
+      double duration = now - chargeStartTime;
+
+      // Map duration to speed
+      // Min speed 10, Max speed 50
+      // Max charge time 1.0 second
+      double maxChargeTime = 1.0;
+      double minSpeed = 10.0;
+      double maxSpeed = 50.0;
+
+      if (duration > maxChargeTime)
+        duration = maxChargeTime;
+
+      double speed =
+          minSpeed + (duration / maxChargeTime) * (maxSpeed - minSpeed);
+
+      shootArrow(&arrow, px, py, pz, th, ph, speed);
+
+      // Reset charge time
+      chargeStartTime = 0;
+    }
   }
 }
 

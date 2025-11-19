@@ -14,7 +14,8 @@
  *  texture: OpenGL texture ID (0 for no texture)
  *  showNormals: whether to draw normal vectors
  */
-void drawGround(double steepness, double size, double groundY, unsigned int texture, int showNormals);
+void drawGround(double steepness, double size, double groundY,
+                unsigned int texture, int showNormals);
 
 /*
  *  Draw a circular mountain ring (bowl-like) surrounding the ground island
@@ -26,6 +27,7 @@ void drawGround(double steepness, double size, double groundY, unsigned int text
  *  heightScale: vertical scale of the mountains (higher => taller mountains)
  */
 void drawMountainRing(double innerR, double outerR, double baseY,
-					  unsigned int texture, int showNormals, double heightScale);
+                      unsigned int texture, int showNormals,
+                      double heightScale);
 
 #endif
