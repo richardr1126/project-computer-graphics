@@ -8,7 +8,7 @@
  *    [/]    Zoom in/out (orbit modes only)
  *    0      Reset view (camera position/angles, FOV)
  *    g/G    Toggle axes display
- *    h/H    Toggle HUD
+ *    h/H    Cycle HUD modes (0=hint only, 1=controls, 2=all)
  *    ESC    Exit
  *  Camera Controls:
  *    Left-click drag Look around (first-person mode)
@@ -20,10 +20,12 @@
  *    l/L    Toggle lighting on/off
  *    1/2    Raise/lower light height
  *    3/4    Increase/decrease light distance
- *    5      Pause/resume light rotation
- *    6      Manual light rotation (when paused)
- *    f/F    Toggle smooth/flat shading
- *  Object Controls:
+ *  Sky/Time Controls (light rotation tied to day/night cycle):
+ *    5      Pause/resume day/night cycle and light rotation
+ *    6/7    Increase/decrease cycle speed
+ *    9      Manual time step forward (when paused)
+ *  Other Controls:
+ *    o/O    Toggle texture filtering optimizations (mipmaps + anisotropy)
  *    p/P    Pause/resume bullseye motion
  *    n/N    Toggle normals debug lines
  */
@@ -46,13 +48,18 @@ int mode = 2;      //  View mode: 1=Perspective (orbit), 2=First-Person
 int fov = 55;      //  Field of view for perspective
 double asp = 1;    //  Aspect ratio
 double dim = 25.0; //  World size for projection (increased to see full scene)
-int showHUD = 1;   //  HUD visibility toggle
+int showHUD = 2;   //  HUD mode: 0=hint only, 1=controls only, 2=all
+int textureOptimizations = 1; //  Texture filtering mode: 1=optimized, 0=basic
+int anisoSupported = 0;
+float maxAniso = 1.0f;
 //  First-person camera
 double px = 0, py = 0, pz = 17;     // Position of the camera in world coords
 double moveStep = 7.0;              // Movement speed (units per second)
 int kW = 0, kA = 0, kS = 0, kD = 0; // WASD movement keys
 // Mouse look state (first-person)
-int mouseLook = 0;              // 1 while left button held for looking
+int mouseLook = 0;              // 1 while left or right button held for looking
+int leftMouseDown = 0;
+int rightMouseDown = 0;
 int lastX = 0, lastY = 0;       // last mouse position
 double mouseSensitivity = 0.15; // degrees per pixel (lower for smoother feel)
 // Bullseye motion
@@ -61,12 +68,13 @@ int moveTargets = 1;      // Toggle bullseye motion
 double targetRate = 90.0; // default target motion speed (degrees per second)
 //  Lighting
 int light = 1;           // Lighting toggle
-double lightRate = 70.0; // light rotation speed (degrees per second)
-int moveLight = 1;       // Toggle light motion
-double zhLight = 0;      // Animation angle for light motion (degrees)
-double ylight = 0.0;     // Elevation of the light
-double ldist = 8.0;      // Light distance from origin in XZ plane
-int smooth = 1;          //  Shading mode: 1=Smooth, 0=Flat
+double ylight = 8.0;     // Elevation of the light
+double ldist = 15.0;     // Light distance from origin in XZ plane
+
+//  Day/Night Cycle
+double dayNightCycle = 0.0;   // 0.0-1.0: 0 and 1 are noon, 0.5 is midnight
+double cycleRate = 0.05;      // cycle speed (cycles per second) = 20 second full cycle
+int moveCycle = 1;            // Toggle day/night cycle motion
 //  Debug helpers
 int showNormals = 0; //  Toggle drawing of normal vectors
 //  Textures
@@ -88,35 +96,53 @@ double fps = 0.0;         // Current frames per second
 int frameCount = 0;       // Frame counter for FPS calculation
 double lastFPSTime = 0.0; // Last time FPS was calculated
 
+// Cache anisotropic filter support once we have a GL context
+void detectAnisoSupport() {
+  const char *ext = (const char *)glGetString(GL_EXTENSIONS);
+  if (ext && strstr(ext, "GL_EXT_texture_filter_anisotropic")) {
+    anisoSupported = 1;
+    glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &maxAniso);
+  }
+}
+
+// Apply the current filtering mode to a texture (optimized vs basic)
+void applyTextureFiltering(unsigned int texture) {
+  if (!texture)
+    return;
+  glBindTexture(GL_TEXTURE_2D, texture);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  if (textureOptimizations) {
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
+                    GL_LINEAR_MIPMAP_LINEAR);
+    if (anisoSupported)
+      glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, maxAniso);
+  } else {
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    if (anisoSupported)
+      glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, 1.0f);
+  }
+}
+
 /*
  *  Draw HUD with controls and status information
+ *  Mode 0: Just hint to press H
+ *  Mode 1: Controls only
+ *  Mode 2: Everything (status + controls)
  */
 void drawHUD() {
   int windowHeight = glutGet(GLUT_WINDOW_HEIGHT);
-  int yBottom = 5;
-
   glColor3f(1, 1, 1);
 
-  // Title and Mode
-  glWindowPos2i(5, yBottom);
-  if (mode == 1)
-    Print("Mode: Perspective | Angle=%d,%d | FOV=%d | Zoom=%.1f", (int)th,
-          (int)ph, fov, dim);
-  else
-    Print("Mode: First-Person | Angle=%d,%d | Pos=(%.1f,%.1f,%.1f) | FOV=%d",
-          (int)th, (int)ph, px, py, pz, fov);
-  // Status line
-  yBottom += 15;
-  glWindowPos2i(5, yBottom);
-  Print("Light: %s | Elev=%.1f | Dist=%.1f | Axes=%s | Shade=%s",
-        light ? "On" : "Off", ylight, ldist, axes ? "On" : "Off",
-        smooth ? "Smooth" : "Flat");
-  // Debug status line
-  yBottom += 15;
-  glWindowPos2i(5, yBottom);
-  Print("Normals: %s | FPS: %.1f", showNormals ? "On" : "Off", fps);
 
-  // Controls section
+  // Mode 0: Just show hint
+  if (showHUD == 0) {
+    int yTop = windowHeight - 15;
+    glWindowPos2i(5, yTop);
+    Print("H) HUD");
+    return;
+  }
+
+  // Mode 1 or 2: Show controls (at top of screen)
   int yTop = windowHeight - 15;
   // Controls section header
   glWindowPos2i(5, yTop);
@@ -133,27 +159,58 @@ void drawHUD() {
   yTop -= 15;
   glWindowPos2i(5, yTop);
   if (mode == 2)
-    Print("  Camera: L-Click)Look  R-Click)Charge/Shoot  W/S)Move  A/D)Strafe");
+    Print("  Camera: L-Click)Look  R-Click)Aim+Shoot  W/S)Move  A/D)Strafe");
   else
     Print("  Camera: Arrows)Look around");
   // Lighting Controls
   yTop -= 15;
   glWindowPos2i(5, yTop);
   if (light) {
-    if (moveLight) {
-      Print("  Lighting: L)Toggle  1/2)Height  3/4)Distance  5)Pause  "
-            "F)Smooth/Flat");
-    } else {
-      Print("  Lighting: L)Toggle  1/2)Height  3/4)Distance  5)Resume  6)Step  "
-            "F)Smooth/Flat");
-    }
+    Print("  Lighting: L)Toggle  1/2)Height  3/4)Distance");
   } else {
     Print("  Lighting: L)Toggle");
   }
-  // Object Controls
+  // Sky/Time Controls
   yTop -= 15;
   glWindowPos2i(5, yTop);
-  Print("  Object: P)Pause/Resume bullseye  N)Debug normals");
+  if (moveCycle) {
+    Print("  Sky/Time: 5)Pause  6/7)Speed (%.2fx)", cycleRate / 0.05);
+  } else {
+    Print("  Sky/Time: 5)Resume  9)Step  6/7)Speed (%.2fx)", cycleRate / 0.05);
+  }
+  // Other Controls (combined)
+  yTop -= 15;
+  glWindowPos2i(5, yTop);
+  Print("  Other: O)Tex Optimize %s  P)Pause bullseye  N)Normals",
+        textureOptimizations ? "On" : "Off");
+
+  // Mode 2 only: Show status info (at bottom of screen)
+  if (showHUD == 2) {
+    int yBottom = 5;
+    // Title and Mode
+    glWindowPos2i(5, yBottom);
+    if (mode == 1)
+      Print("Mode: Perspective | Angle=%d,%d | FOV=%d | Zoom=%.1f", (int)th,
+            (int)ph, fov, dim);
+    else
+      Print("Mode: First-Person | Angle=%d,%d | Pos=(%.1f,%.1f,%.1f) | FOV=%d",
+            (int)th, (int)ph, px, py, pz, fov);
+    // Status line
+    yBottom += 15;
+    glWindowPos2i(5, yBottom);
+    // Calculate if it's day or night for status display
+    double dayFactor = (Cos(dayNightCycle * 360.0) + 1.0) / 2.0;
+    const char* timeOfDay = (dayFactor > 0.5) ? "Day" : "Night";
+    const char* cycleState = moveCycle ? "Running" : "Paused";
+    Print("Light: %s | Time: %s (%s, %.2fx) | Light Elev=%.1f Dist=%.1f",
+          light ? "On" : "Off", timeOfDay, cycleState, cycleRate / 0.05, ylight, ldist);
+    // Debug status line
+    yBottom += 15;
+    glWindowPos2i(5, yBottom);
+    Print("Normals: %s | TexOpt: %s | FPS: %.1f",
+          showNormals ? "On" : "Off",
+          textureOptimizations ? "On" : "Off", fps);
+  }
 }
 
 /*
@@ -220,17 +277,33 @@ void drawCrosshair() {
  *  Enable lighting with moving light position
  */
 void enableLighting() {
-  // Translate intensities to color vectors
-  float Ambient[] = {0.2, 0.2, 0.2, 1.0};
-  float Diffuse[] = {0.8, 0.8, 0.8, 1.0};
+  // Calculate day factor: 1.0 = full day, 0.0 = full night
+  double dayFactor = (Cos(dayNightCycle * 360.0) + 1.0) / 2.0;
+  int isDay = dayFactor > 0.5 ? 1 : 0;
+
+  // Interpolate light intensities based on time of day
+  // Day: brighter ambient and diffuse
+  // Night: dimmer ambient and diffuse
+  float dayAmbient = 0.3;
+  float nightAmbient = 0.05;
+  float dayDiffuse = 0.9;
+  float nightDiffuse = 0.3;
+
+  float ambientIntensity = nightAmbient + dayFactor * (dayAmbient - nightAmbient);
+  float diffuseIntensity = nightDiffuse + dayFactor * (dayDiffuse - nightDiffuse);
+
+  float Ambient[] = {ambientIntensity, ambientIntensity, ambientIntensity, 1.0};
+  float Diffuse[] = {diffuseIntensity, diffuseIntensity, diffuseIntensity, 1.0};
   float Specular[] = {0.5, 0.5, 0.5, 1.0};
 
-  // Light position moving around Y axis with zh
+  // Calculate light position from day/night cycle
+  // 4 full rotations per complete cycle (2 during day, 2 during night)
+  double zhLight = dayNightCycle * 360.0 * 4.0;
   float Position[] = {(ldist * Cos(zhLight)), ylight, (ldist * Sin(zhLight)),
                       1.0};
 
-  // Draw light position as small white ball (unlit)
-  drawLightBall(Position[0], Position[1], Position[2], 0.15);
+  // Draw light position as sun or moon
+  drawLightBall(Position[0], Position[1], Position[2], 0.15, isDay);
 
   // Enable lighting
   glEnable(GL_LIGHTING);
@@ -257,6 +330,9 @@ void display() {
   //  Erase the window and the depth buffer
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+  // Draw sky background first (before any transformations)
+  drawSky(dayNightCycle);
+
   //  Undo previous transformations
   glLoadIdentity();
   //  Set camera/view
@@ -264,8 +340,8 @@ void display() {
 
   //  Enable Z-buffering
   glEnable(GL_DEPTH_TEST);
-  //  Flat or smooth shading
-  glShadeModel(smooth ? GL_SMOOTH : GL_FLAT);
+  //  Use smooth shading
+  glShadeModel(GL_SMOOTH);
   //  Enable back face culling
   // glEnable(GL_CULL_FACE);
 
@@ -333,8 +409,7 @@ void display() {
   glDisable(GL_LIGHTING); // Disable lighting for HUD and axes
   if (axes)
     drawAxes(5.0); // Draw axes
-  if (showHUD)
-    drawHUD(); // Draw HUD
+  drawHUD(); // Draw HUD (handles its own display based on mode)
 
   // Draw Crosshair in First-Person mode
   if (mode == 2)
@@ -414,9 +489,9 @@ void key(unsigned char ch, int x, int y) {
   //  Toggle axes
   else if (ch == 'g' || ch == 'G')
     axes = 1 - axes;
-  //  Toggle HUD
+  //  Cycle HUD modes (0=hint, 1=controls, 2=all)
   else if (ch == 'h' || ch == 'H')
-    showHUD = 1 - showHUD;
+    showHUD = (showHUD + 1) % 3;
   //  Toggle lighting
   else if (ch == 'l' || ch == 'L')
     light = 1 - light;
@@ -435,21 +510,31 @@ void key(unsigned char ch, int x, int y) {
     if (ldist < 0.5)
       ldist = 0.5;
   }
-  //  Toggle light rotation
-  else if (ch == '5')
-    moveLight = 1 - moveLight;
-  //  Manually step light rotation when paused
-  else if (ch == '6' && !moveLight)
-    zhLight = fmod(zhLight + 5.0, 360.0);
-  //  Toggle smooth/flat shading
-  else if (ch == 'f' || ch == 'F')
-    smooth = 1 - smooth;
+
   //  Pause/Resume bullseye motion
   else if (ch == 'p' || ch == 'P')
     moveTargets = 1 - moveTargets;
   //  Toggle normals debug
   else if (ch == 'n' || ch == 'N')
     showNormals = 1 - showNormals;
+  //  Pause/resume day/night cycle
+  else if (ch == '5')
+    moveCycle = 1 - moveCycle;
+  //  Increase cycle speed
+  else if (ch == '6') {
+    cycleRate += 0.01;
+    if (cycleRate > 0.5)
+      cycleRate = 0.5;
+  }
+  //  Decrease cycle speed
+  else if (ch == '7') {
+    cycleRate -= 0.01;
+    if (cycleRate < 0.01)
+      cycleRate = 0.01;
+  }
+  //  Manually step time when paused
+  else if (ch == '9' && !moveCycle)
+    dayNightCycle = fmod(dayNightCycle + 0.01, 1.0);
   //  Toggle projection mode (TAB key)
   else if (ch == 9) {
     mode = (mode == 1) ? 2 : 1; // Toggle between 1 and 2
@@ -465,6 +550,8 @@ void key(unsigned char ch, int x, int y) {
       ph = 45.0;
       // Ensure any mouse-look drag is cleared when leaving FP
       mouseLook = 0;
+      leftMouseDown = 0;
+      rightMouseDown = 0;
     }
   }
   //  Change field of view angle
@@ -480,6 +567,15 @@ void key(unsigned char ch, int x, int y) {
   } else if (ch == ']' && dim > 5.0) {
     if (mode == 1)
       dim -= 2.0;
+  }
+  //  Toggle texture filtering optimizations (mipmapping + anisotropy)
+  else if (ch == 'o' || ch == 'O') {
+    textureOptimizations = 1 - textureOptimizations;
+    applyTextureFiltering(groundTexture);
+    applyTextureFiltering(mountainTexture);
+    applyTextureFiltering(woodTexture);
+    applyTextureFiltering(barkTexture);
+    applyTextureFiltering(leafTexture);
   }
   //  Update projection
   Project(mode, fov, asp, dim);
@@ -543,14 +639,15 @@ void idle() {
     fpUpdateMove(th, kW, kS, kA, kD, moveStep, dt, &px, &pz);
   }
 
-  // Light moves only when enabled
-  if (moveLight)
-    zhLight = fmod(zhLight + lightRate * dt, 360.0);
+  // Light position is calculated from dayNightCycle in enableLighting()
   // Bullseyes move only when enabled
   if (moveTargets)
     zhTargets = fmod(zhTargets + targetRate * dt, 360.0);
   // Trees sway continuously (gentle)
   zhTrees = fmod(zhTrees + 25.0 * dt, 360.0);
+  // Day/Night cycle advances when enabled
+  if (moveCycle)
+    dayNightCycle = fmod(dayNightCycle + cycleRate * dt, 1.0);
 
   // Update arrow physics
   updateArrow(&arrow, dt);
@@ -564,39 +661,53 @@ void idle() {
 void mouse(int button, int state, int x, int y) {
   if (mode != 2)
     return;
+
   if (button == GLUT_LEFT_BUTTON) {
     if (state == GLUT_DOWN) {
+      leftMouseDown = 1;
       mouseLook = 1;
       lastX = x;
       lastY = y;
     } else if (state == GLUT_UP) {
-      mouseLook = 0;
+      leftMouseDown = 0;
+      if (!rightMouseDown)
+        mouseLook = 0;
     }
     glutPostRedisplay();
   } else if (button == GLUT_RIGHT_BUTTON) {
-    // Right click to shoot (Charge mechanic)
+    // Right click to shoot (Charge mechanic) and allow look-drag while aiming
     if (state == GLUT_DOWN) {
+      rightMouseDown = 1;
+      mouseLook = 1;
+      lastX = x;
+      lastY = y;
       // Start charging
       chargeStartTime = glutGet(GLUT_ELAPSED_TIME) / 1000.0;
     } else if (state == GLUT_UP) {
-      // Release to shoot
-      double now = glutGet(GLUT_ELAPSED_TIME) / 1000.0;
-      double duration = now - chargeStartTime;
+      rightMouseDown = 0;
+      if (!leftMouseDown)
+        mouseLook = 0;
 
-      // Map duration to speed
-      // Min speed 10, Max speed 50
-      // Max charge time 1.0 second
-      double maxChargeTime = 1.0;
-      double minSpeed = 10.0;
-      double maxSpeed = 50.0;
+      if (chargeStartTime > 0.0) {
+        // Release to shoot
+        double now = glutGet(GLUT_ELAPSED_TIME) / 1000.0;
+        double duration = now - chargeStartTime;
 
-      if (duration > maxChargeTime)
-        duration = maxChargeTime;
+        // Map duration to speed
+        // Min speed 10, Max speed 50
+        // Max charge time 1.0 second
+        double maxChargeTime = 1.0;
+        double minSpeed = 10.0;
+        double maxSpeed = 50.0;
 
-      double speed =
-          minSpeed + (duration / maxChargeTime) * (maxSpeed - minSpeed);
+        if (duration > maxChargeTime)
+          duration = maxChargeTime;
 
-      shootArrow(&arrow, px, py, pz, th, ph, speed);
+        double speed =
+            minSpeed + (duration / maxChargeTime) * (maxSpeed - minSpeed);
+
+        shootArrow(&arrow, px, py, pz, th, ph, speed);
+      }
 
       // Reset charge time
       chargeStartTime = 0;
@@ -642,6 +753,8 @@ int main(int argc, char *argv[]) {
   if (glewInit() != GLEW_OK)
     Fatal("Error initializing GLEW\n");
 #endif
+  //  Detect anisotropic filtering support once a GL context exists
+  detectAnisoSupport();
   //  Load ground texture
   groundTexture = LoadTexBMP("textures/ground.bmp");
   //  Load mountain texture (surrounding ring)
@@ -652,6 +765,12 @@ int main(int argc, char *argv[]) {
   barkTexture = LoadTexBMP("textures/bark.bmp");
   //  Load leaf texture with proper alpha settings
   leafTexture = LoadTexBMP("textures/leaf.bmp");
+  //  Apply preferred filtering mode to all textures
+  applyTextureFiltering(groundTexture);
+  applyTextureFiltering(mountainTexture);
+  applyTextureFiltering(woodTexture);
+  applyTextureFiltering(barkTexture);
+  applyTextureFiltering(leafTexture);
   //  Tell GLUT to call "display" when the scene should be drawn
   glutDisplayFunc(display);
   //  Tell GLUT to call "idle" when there is nothing else to do (animate)

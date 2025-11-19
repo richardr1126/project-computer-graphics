@@ -9,9 +9,11 @@ Implements texture mapping on a 3D scene with lighting. Features a textured terr
 - **View Modes**: Switch between perspective (orbit) and first-person views.
 - **Smooth First-Person Move & Look**: Hold WASD to move, click-drag mouse to look around; motion is frame-rate independent, diagonals normalized, and camera angles use smooth double precision.
 - **32-bit BMP Loading**: Make LoadTexBMP() support 32-bit BMPs with alpha channels.
-- **Lighting**: Animated light source (rendered as bright sphere) with ambient, diffuse, and specular components. Supports smooth and flat shading modes.
-  - **Light Controls**: Adjust light height and distance, pause/resume rotation, manual rotation, and smooth/flat shading toggle.
+- **Lighting**: Animated light source (rendered as bright sphere) with ambient, diffuse, and specular components using smooth shading. Light rotation is synchronized with the day/night cycle.
+  - **Light Controls**: Adjust light height and distance.
   - **Normals Debugging**: Toggle display of normals for all objects.
+- **Day/Night Cycle**: Dynamic sky with smooth transitions between day (blue gradient) and night (dark blue gradient). The light source rotates in sync with the cycle: 2 full rotations during day (sun, bright yellow) and 2 full rotations during night (moon, dim blue-white), with lighting intensity adjusting accordingly.
+  - **Sky/Time Controls**: Pause/resume the cycle (also pauses/resumes light rotation), manually step through time, and adjust cycle speed (also affects light rotation speed).
 - **Archery Mechanics**:
   - **Shooting**: First-person shooting with charge-up mechanic. Hold right-click to charge power (visualized by dynamic crosshair), release to shoot.
   - **Physics**: Arrows follow physics trajectories with gravity.
@@ -41,7 +43,7 @@ zip -r project.zip .
 | +/-    | Change field of view (perspective modes) |
 | 0      | Reset view (camera position/angles, FOV) |
 | g/G    | Toggle axes display |
-| h/H    | Toggle HUD |
+| h/H    | Cycle HUD modes (0=hint only, 1=controls, 2=all) |
 | ESC    | Exit |
 
 ### Camera & Interaction Controls
@@ -59,15 +61,22 @@ zip -r project.zip .
 | l/L    | Toggle lighting on/off |
 | 1/2    | Raise/lower light height |
 | 3/4    | Increase/decrease light distance |
-| 5      | Pause/resume light rotation |
-| 6      | Manual light rotation (when paused) |
-| f/F    | Toggle smooth/flat shading |
 
-### Object Controls
+### Sky/Time Controls (Light rotation tied to day/night cycle)
 | Key    | Action |
 |--------|--------|
+| 5      | Pause/resume day/night cycle and light rotation |
+| 6/7    | Increase/decrease cycle speed (affects both time and light rotation) |
+| 9      | Manual time step forward (when paused) |
+
+### Other Controls
+| Key    | Action |
+|--------|--------|
+| o/O    | Toggle texture filtering optimizations (mipmaps + anisotropic filtering) |
 | p/P    | Pause/resume bullseye motion |
 | n/N    | Toggle normals debug lines |
+
+The HUD cycles through three modes with `h/H`: hint-only, controls-only, and full status. In full mode it reports normals visibility, texture optimization state, and FPS.
 
 ## How to run
 
@@ -80,7 +89,8 @@ make        # builds the project
 
 - Trunks vs Leaves Split: Scene renders in two passes — opaque trunks/branches first, then transparent leaves. The leaf pass traverses the same hierarchy but emits leaves only (no duplicate trunk geometry), cutting CPU draw calls and overdraw.
 - Leaves-Only Path: A `leavesOnly` render mode reuses identical transforms so leaf placement matches the opaque pass exactly, but skips all `glBegin/glEnd` for frustums and normals.
-- Culling for Trunks/Branches: Back-face culling is enabled only for the opaque tree pass (both trunk and branch frustums) and set to clockwise front faces during that pass (`glFrontFace(GL_CW)`), then restored. This halves fragment work on the bark geometry without affecting leaves.
+- Culling for Trunks/Branches: Back-face culling is enabled for the opaque tree pass (both trunk and branch frustums) and set to clockwise front faces during that pass (`glFrontFace(GL_CW)`), then restored. This halves fragment work on the bark geometry without affecting leaves.
+- Culling for terrain: The ground and mountain meshes also have back-face culling enabled, reducing fragment processing on downward-facing triangles.
 - Alpha Test for Leaves: Alpha testing is enabled during the leaf pass (`glAlphaFunc(GL_GREATER, 0.1f)`), discarding fully transparent texels to reduce blending overdraw.
 - Reduced State Churn: Leaf texture is bound once for the entire transparent pass; per-leaf `glEnable(GL_TEXTURE_2D)`/`glBindTexture` calls were removed. Per-frustum texture parameter changes were removed from hot loops.
 - Disabled GL_NORMALIZE: Normals are pre-normalized for trunks/ground, and lighting is off for the light sphere’s scale. Disabling `GL_NORMALIZE` removes per-vertex renormalization overhead.
@@ -88,6 +98,7 @@ make        # builds the project
 - Ground Display List + Strips: The terrain mesh is precomputed once (heights + normals) and cached in an OpenGL display list rendered as row-wise `GL_TRIANGLE_STRIP`s. This eliminates per-frame height/normal recomputation and slashes immediate-mode submissions. The list rebuilds only if `steepness`, `size`, `groundY`, or the ground texture changes.
 - Swap-Only Present: Removed an explicit `glFlush()` before buffer swap; rely on `glutSwapBuffers()` which flushes implicitly, reducing driver overhead slightly.
 - Anisotropic Filtering (if available): Texture loader enables the maximum supported anisotropy via `GL_EXT_texture_filter_anisotropic` for sharper textures at grazing angles.
+- Texture Filtering Toggle: Press `o/O` to switch between optimized filtering (mipmaps + anisotropic filtering when supported) and a basic linear mode for comparison; the HUD reports the current state.
 
 ## Texture credits
 
