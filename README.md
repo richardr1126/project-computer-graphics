@@ -8,6 +8,7 @@ Implements texture mapping on a 3D scene with lighting. Features a textured terr
 ### Features Implemented
 - **View Modes**: Switch between perspective (orbit) and first-person views.
 - **Smooth First-Person Move & Look**: Hold WASD to move, click-drag mouse to look around; motion is frame-rate independent, diagonals normalized, and camera angles use smooth double precision.
+- **32-bit BMP Loading**: Make LoadTexBMP() support 32-bit BMPs with alpha channels.
 - **Lighting**: Animated light source (rendered as bright sphere) with ambient, diffuse, and specular components. Supports smooth and flat shading modes.
   - **Light Controls**: Adjust light height and distance, pause/resume rotation, manual rotation, and smooth/flat shading toggle.
   - **Normals Debugging**: Toggle display of normals for all objects.
