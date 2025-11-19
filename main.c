@@ -27,6 +27,7 @@
  *    n/N    Toggle normals debug lines
  */
 //  Include custom modules
+#include "objects/arrow.h"
 #include "objects/axes.h"
 #include "objects/bullseye.h"
 #include "objects/ground.h"
@@ -243,6 +244,10 @@ void display() {
   drawTreeScene(zhTrees, showNormals, barkTexture, 0);
   glFrontFace(GL_CCW); // Restore default front-face winding
   glDisable(GL_CULL_FACE);
+
+  // Draw Arrow (static for now)
+  Arrow arrow = {0, 5, 0, 1, 0, 0, 1.0};
+  drawArrow(&arrow, showNormals);
 
   // ===== TRANSPARENT PASS: Draw all transparent objects last =====
   glEnable(GL_BLEND);
