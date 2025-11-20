@@ -7,6 +7,31 @@
 #include "../utils.h"
 
 /*
+ *  Aim a bullseye so its face points toward a target point in XZ
+ *  Used to keep targets oriented toward the player's starting area
+ */
+static void orientTowardXZ(Bullseye *b, double tx, double tz) {
+  if (!b) return;
+  double vx = tx - b->x;
+  double vz = tz - b->z;
+  double len = sqrt(vx * vx + vz * vz);
+  if (len < 1e-6) {
+    b->dx = 1.0;
+    b->dy = 0.0;
+    b->dz = 0.0;
+  } else {
+    vx /= len;
+    vz /= len;
+    b->dx = vz;
+    b->dy = 0.0;
+    b->dz = -vx;
+  }
+  b->ux = 0.0;
+  b->uy = 1.0;
+  b->uz = 0.0;
+}
+
+/*
  *  Apply translation and orientation for a bullseye given Bullseye struct
  *  @param b pointer to Bullseye structure
  */
@@ -249,61 +274,52 @@ static void drawBullseyeWithNormals(const Bullseye *b, unsigned int texture, int
  *  @param texture texture ID
  */
 void drawBullseyeScene(double zh, int showNormals, unsigned int texture) {
+  const double aimX = 0.0;
+  const double aimZ = 30.0;
   double off = 3.0 * Sin(zh);
 
   Bullseye b1 = {
-    .x = 0.0, .y = 0.0, .z = 0.0,
-    .dx = 1.0, .dy = 0.0, .dz = 0.0,
-    .ux = 0.0, .uy = 1.0, .uz = 0.0,
+    .x = 0.0, .y = 0.0, .z = -1.5 + 0.4 * off,
     .radius = 2.0,
     .rings = 6,
     .r = 1.0, .g = 0.0, .b = 0.0
   };
+  orientTowardXZ(&b1, aimX, aimZ);
   drawBullseyeWithNormals(&b1, texture, showNormals);
 
-  double cos45 = Cos(45), sin45 = Sin(45);
-  double moveX1 = cos45 * off;
-  double moveZ1 = -sin45 * off;
   Bullseye b2 = {
-    .x = -3.0 + moveX1, .y = 5.0, .z = -1.0 + moveZ1,
-    .dx = cos45, .dy = 0.0, .dz = sin45,
-    .ux = 0.0, .uy = 1.0, .uz = 0.0,
+    .x = -8.0 + 0.6 * off, .y = 5.0, .z = -4.0 - 0.4 * off,
     .radius = 1.25,
     .rings = 5,
     .r = 0.0, .g = 0.0, .b = 1.0
   };
+  orientTowardXZ(&b2, aimX, aimZ);
   drawBullseyeWithNormals(&b2, texture, showNormals);
 
   Bullseye b3 = {
-    .x = 3.0 + off, .y = 5.0, .z = 1.0,
-    .dx = Cos(-30), .dy = 0.0, .dz = Sin(-30),
-    .ux = 0.0, .uy = 1.0, .uz = 0.0,
+    .x = 8.0 - 0.6 * off, .y = 5.0, .z = -4.0 + 0.4 * off,
     .radius = 1.25,
     .rings = 4,
     .r = 0.0, .g = 1.0, .b = 0.0
   };
+  orientTowardXZ(&b3, aimX, aimZ);
   drawBullseyeWithNormals(&b3, texture, showNormals);
 
-  double cos60 = Cos(60), sin60 = Sin(60);
-  double moveX3 = cos60 * off;
-  double moveZ3 = -sin60 * off;
   Bullseye b4 = {
-    .x = -3.0 + moveX3, .y = 1.5, .z = -1.0 + moveZ3,
-    .dx = cos60, .dy = 0.0, .dz = sin60,
-    .ux = 0.0, .uy = 1.0, .uz = 0.0,
+    .x = -7.0 + 0.5 * off, .y = 1.75, .z = 5.5 + 0.7 * off,
     .radius = 1.25,
     .rings = 4,
     .r = 1.0, .g = 0.0, .b = 1.0
   };
+  orientTowardXZ(&b4, aimX, aimZ);
   drawBullseyeWithNormals(&b4, texture, showNormals);
 
   Bullseye b5 = {
-    .x = 3.0, .y = 2.5, .z = 1.0 + off,
-    .dx = 0.0, .dy = 0.0, .dz = 1.0,
-    .ux = 0.0, .uy = 1.0, .uz = 0.0,
+    .x = 7.5 - 0.5 * off, .y = 2.25, .z = 6.0 + 0.6 * off,
     .radius = 1.25,
     .rings = 5,
     .r = 0.0, .g = 1.0, .b = 1.0
   };
+  orientTowardXZ(&b5, aimX, aimZ);
   drawBullseyeWithNormals(&b5, texture, showNormals);
 }

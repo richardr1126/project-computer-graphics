@@ -53,7 +53,7 @@ int textureOptimizations = 1; //  Texture filtering mode: 1=optimized, 0=basic
 int anisoSupported = 0;
 float maxAniso = 1.0f;
 //  First-person camera
-double px = 0, py = 0, pz = 17;     // Position of the camera in world coords
+double px = 0, py = 0, pz = 30;     // Position of the camera in world coords
 double moveStep = 7.0;              // Movement speed (units per second)
 int kW = 0, kA = 0, kS = 0, kD = 0; // WASD movement keys
 // Mouse look state (first-person)
@@ -73,8 +73,8 @@ Arrow arrow = {0, 5, 0, 1, 0, 0, 0, 0, 0, 1.0, 0}; // Initial static arrow
 double chargeStartTime = 0; // Time when right click started
 //  Lighting
 int light = 1;           // Lighting toggle
-double ylight = 8.0;     // Elevation of the light
-double ldist = 15.0;     // Light distance from origin in XZ plane
+double ylight = 12.0;     // Elevation of the light
+double ldist = 24.0;     // Light distance from origin in XZ plane
 //  Day/Night Cycle
 double dayNightCycle = 0.0;   // 0.0-1.0: 0 and 1 are noon, 0.5 is midnight
 double cycleRate = 0.05;      // cycle speed (cycles per second) = 20 second full cycle
@@ -453,7 +453,7 @@ void key(unsigned char ch, int x, int y) {
   else if (ch == '0') {
     px = 0;
     py = 0;
-    pz = 17;
+    pz = 30;
     fov = 55;
     dim = 25.0;
     // Reset view angles depending on mode
