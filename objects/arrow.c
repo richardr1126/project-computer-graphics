@@ -275,7 +275,7 @@ void updateArrow(Arrow *arrow, double dt) {
     arrow->dz = arrow->vz / speed;
   }
 
-  // Ground collision 
+  // Collision 
   // TODO
 }
 

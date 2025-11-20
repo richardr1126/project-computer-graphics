@@ -129,8 +129,8 @@ static void drawFrustumNormals(double r0, double r1, double length) {
  */
 static void addLeavesToBranch(int depth, double len, double r, double anim,
                               unsigned int leafTexture, unsigned int seed) {
-  if (!leafTexture || depth > 2)
-    return; /* Only add leaves to outer branches */
+  /* Only add leaves to outer branches */
+  if (!leafTexture || depth > 2) return;
 
   /* Number of leaf clusters based on depth */
   int numLeaves = (depth == 1) ? (3 + (int)(2.0 * Rand01(seed + 300u)))
@@ -437,8 +437,7 @@ void drawTree(const Tree *t, int leavesOnly) {
     }
   }
   glTranslated(0, flareLen, 0);
-  double baseLen =
-      (t->baseLength > flareLen) ? (t->baseLength - flareLen) : t->baseLength;
+  double baseLen = (t->baseLength > flareLen) ? (t->baseLength - flareLen) : t->baseLength;
 
   drawBranch(baseLen, t->baseRadius, t->depth, t->anim, t->barkTexture,
              t->showNormals, t->leafTexture, t->seed, leavesOnly);
@@ -454,9 +453,7 @@ static void drawTreeAt(double x, double z, double anim,
   double baseRad = 0.25 + 0.08 * Rand01(seed + 6u);
   int depth = 4 + (int)(2.0 * Rand01(seed + 7u));
 
-  Tree t = {.x = x,
-            .y = y,
-            .z = z,
+  Tree t = {.x = x, .y = y, .z = z,
             .baseLength = baseLen,
             .baseRadius = baseRad,
             .depth = depth,
@@ -497,7 +494,6 @@ void drawTreeScene(double anim, int showNormals, unsigned int barkTexture,
  * @param leafTexture leaf texture
  */
 void drawTreeLeaves(double anim, unsigned int leafTexture) {
-  if (!leafTexture)
-    return;
+  if (!leafTexture) return;
   drawForest(anim, 0, 0, leafTexture, 1);
 }

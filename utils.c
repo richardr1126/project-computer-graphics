@@ -1,8 +1,8 @@
-//  Willem A. (Vlakkies) Schreuder
 #include "utils.h"
 
 /*
  *  Print message to stderr and exit
+ *  Original author: Willem A. (Vlakkies) Schreuder
  *  @param format format string
  *  @param ... arguments
  */
@@ -16,6 +16,7 @@ void Fatal(const char *format, ...) {
 
 /*
  *  Check for OpenGL errors and print to stderr
+ *  Original author: Willem A. (Vlakkies) Schreuder
  *  @param where location of error
  */
 void ErrCheck(const char *where) {
@@ -121,6 +122,7 @@ double Rand01(unsigned int seed) {
 
 /*
  *  Reverse n bytes
+ *  Original author: Willem A. (Vlakkies) Schreuder
  *  @param x pointer to bytes
  *  @param n number of bytes
  */
@@ -135,6 +137,8 @@ static void Reverse(void *x, const int n) {
 
 /*
  *  Load texture from BMP file
+ *  Original author: Willem A. (Vlakkies) Schreuder
+ *  Extended with 32-bit support by Richard Roberson
  *  @param file name of file
  *  @return texture name
  */

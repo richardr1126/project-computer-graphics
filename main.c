@@ -50,9 +50,6 @@ int fov = 55;      //  Field of view for perspective
 double asp = 1;    //  Aspect ratio
 double dim = 25.0; //  World size for projection (increased to see full scene)
 int showHUD = 2;   //  HUD mode: 0=hint only, 1=controls only, 2=all
-int textureOptimizations = 1; //  Texture filtering mode: 1=optimized, 0=basic
-int anisoSupported = 0;
-float maxAniso = 1.0f;
 //  First-person camera
 double px = 0, py = 0, pz = 30;     // Position of the camera in world coords
 double moveStep = 7.0;              // Movement speed (units per second)
@@ -85,6 +82,9 @@ int moveCycle = 1;            // Toggle day/night cycle motion
 //  Debug helpers
 int showNormals = 0; //  Toggle drawing of normal vectors
 //  Textures
+int textureOptimizations = 1; //  Texture filtering mode: 1=optimized, 0=basic
+int anisoSupported = 0;
+float maxAniso = 1.0f;
 unsigned int groundTexture = 0;   // Ground texture ID
 unsigned int mountainTexture = 0; // Mountain ring texture ID
 unsigned int woodTexture = 0;     // Wood texture ID for bullseyes
