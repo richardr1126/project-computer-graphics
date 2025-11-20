@@ -14,11 +14,14 @@ Implements texture mapping on a 3D scene with lighting. Features a textured terr
   - **Light Sphere**: Smooth light source for the scene, which transitions between sun and moon lighting.
 
 - **Environment**:
-  - **Lighting**: Animated light sphere with ambient, diffuse, and specular components using smooth shading. Shift between moon-like components and sun-like components based on the time of day.
+  - **Day/Night Cycle**: Dynamic sky with smooth transitions between day (blue gradient) and night (dark blue gradient). The time of day is determined by the rotation degree of the light source, 4 rotations is a full day/night cycle, with lighting intensity adjusting accordingly.
+    - **Sky/Time Controls**: Pause/resume the environment time cycle, manually step through time, and adjust cycle speed (effects light rotation speed).
+  - **Atmospheric Fog**: Distance-based fog that blends object color with the sky color based on distance from the camera.
+    - Fog color smoothly follows the day/night cycle (blue-tinted in day, darker at night).
+    - Fog is stronger/denser at night, and very subtle during the day so nearby terrain remains clear.
+  - **Lighting**: Animated light source with ambient, diffuse, and specular components using smooth shading. Shift between moon-like components and sun-like components based on the time of day.
     - **Light Controls**: Adjust light height and distance.
     - **Normals Debugging**: Toggle display of normals for all objects.
-  - **Day/Night Cycle**: Dynamic sky with smooth transitions between day (blue gradient) and night (dark blue gradient). The time of day is determined by the rotation degree of the light sphere, 2 full rotations during day (sun, bright yellow) and 2 full rotations during night (moon, dim blue-white), with lighting intensity adjusting accordingly.
-    - **Sky/Time Controls**: Pause/resume the environment time cycle, manually step through time, and adjust cycle speed (effects light rotation speed).
 
 - **Archery Mechanics**:
   - **Shooting**: First-person shooting with charge-up mechanic. Hold right-click to charge power (visualized by dynamic crosshair), release to shoot.
@@ -101,6 +104,7 @@ zip -r final.zip . -x ".git/*"
 | Key    | Action |
 |--------|--------|
 | o/O    | Toggle texture filtering optimizations (mipmaps + anisotropic filtering) |
+| f/F    | Toggle distance fog on/off |
 | p/P    | Pause/resume bullseye motion |
 | n/N    | Toggle normals debug lines |
 

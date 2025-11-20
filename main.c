@@ -26,6 +26,7 @@
  *    9      Manual time step forward (when paused)
  *  Other Controls:
  *    o/O    Toggle texture filtering optimizations (mipmaps + anisotropy)
+ *    f/F    Toggle distance fog
  *    p/P    Pause/resume bullseye motion
  *    n/N    Toggle normals debug lines
  */
@@ -75,6 +76,8 @@ double chargeStartTime = 0; // Time when right click started
 int light = 1;           // Lighting toggle
 double ylight = 12.0;     // Elevation of the light
 double ldist = 24.0;     // Light distance from origin in XZ plane
+//  Fog
+int fog = 1;             // Fog toggle (1=enabled, 0=disabled)
 //  Day/Night Cycle
 double dayNightCycle = 0.0;   // 0.0-1.0: 0 and 1 are noon, 0.5 is midnight
 double cycleRate = 0.05;      // cycle speed (cycles per second) = 20 second full cycle
@@ -173,7 +176,7 @@ void drawHUD() {
   // Other Controls (combined)
   yTop -= 15;
   glWindowPos2i(5, yTop);
-  Print("  Other: O)Tex Optimize %s  P)Pause bullseye  N)Normals",
+  Print("  Other: O)Tex Optimize %s  F)Fog  P)Pause bullseye  N)Normals",
         textureOptimizations ? "On" : "Off");
 
   // Mode 2 only: Show status info (at bottom of screen)
@@ -316,11 +319,66 @@ void enableLighting() {
 }
 
 /*
+ *  Enable distance fog to blend object color with the background
+ *  Uses linear fog based on distance from the viewer.
+ */
+void enableFog() {
+  glEnable(GL_FOG);
+
+  // Fog color roughly matches sky/horizon color and changes with time of day
+  double dayFactor = (Cos(dayNightCycle * 360.0) + 1.0) / 2.0; // 0=night,1=day
+
+  // Day and night horizon-like colors (averaged from sky top/bottom)
+  float dayFogTop[3] = {0.4f, 0.6f, 0.9f};
+  float dayFogBot[3] = {0.7f, 0.85f, 1.0f};
+  float nightFogTop[3] = {0.05f, 0.05f, 0.15f};
+  float nightFogBot[3] = {0.1f, 0.1f, 0.25f};
+
+  float dayFog[3] = {
+      (dayFogTop[0] + dayFogBot[0]) * 0.5f,
+      (dayFogTop[1] + dayFogBot[1]) * 0.5f,
+      (dayFogTop[2] + dayFogBot[2]) * 0.5f};
+  float nightFog[3] = {
+      (nightFogTop[0] + nightFogBot[0]) * 0.5f,
+      (nightFogTop[1] + nightFogBot[1]) * 0.5f,
+      (nightFogTop[2] + nightFogBot[2]) * 0.5f};
+
+  float fogColor[4];
+  for (int i = 0; i < 3; ++i) {
+    fogColor[i] = nightFog[i] + dayFactor * (dayFog[i] - nightFog[i]);
+  }
+  fogColor[3] = 1.0f;
+
+  glFogfv(GL_FOG_COLOR, fogColor);
+  glFogi(GL_FOG_MODE, GL_LINEAR);
+
+  // Linear fog parameters: heavier at night, lighter during day
+  // Night: closer start/end -> stronger fog
+  const float fogStartNight = 20.0f;
+  const float fogEndNight   = 120.0f;
+  // Day: farther start/end -> very subtle fog
+  const float fogStartDay = 95.0f;
+  const float fogEndDay   = 350.0f;
+
+  float fogStart = fogStartNight + dayFactor * (fogStartDay - fogStartNight);
+  float fogEnd   = fogEndNight   + dayFactor * (fogEndDay   - fogEndNight);
+
+  glFogf(GL_FOG_START, fogStart);
+  glFogf(GL_FOG_END, fogEnd);
+
+  glHint(GL_FOG_HINT, GL_NICEST);
+}
+
+/*
  *  OpenGL (GLUT) calls this routine to display the scene
  */
 void display() {
   //  Erase the window and the depth buffer
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+  // Configure distance fog (color based on day/night)
+  if (fog) enableFog();
+  else glDisable(GL_FOG);
 
   // Draw sky background first (before any transformations)
   drawSky(dayNightCycle);
@@ -329,19 +387,14 @@ void display() {
   glLoadIdentity();
   //  Set camera/view
   setViewMode(mode, th, ph, dim, px, py, pz);
-
   //  Enable Z-buffering
   glEnable(GL_DEPTH_TEST);
   //  Use smooth shading
   glShadeModel(GL_SMOOTH);
-  //  Enable back face culling
-  // glEnable(GL_CULL_FACE);
 
   // Lighting setup
-  if (light)
-    enableLighting();
-  else
-    glDisable(GL_LIGHTING);
+  if (light) enableLighting();
+  else glDisable(GL_LIGHTING);
 
   // ===== OPAQUE PASS: Draw all opaque objects first =====
   glDepthMask(GL_TRUE);
@@ -381,7 +434,7 @@ void display() {
   // ===== TRANSPARENT PASS: Draw all transparent objects last =====
   glEnable(GL_BLEND);
   glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-  glDepthMask(GL_FALSE); // CRITICAL: disable depth writing for transparency
+  glDepthMask(GL_FALSE); // IMPORTANT: disable depth writing for transparency
 
   // Draw tree leaves (transparent)
   glEnable(GL_TEXTURE_2D);
@@ -399,13 +452,12 @@ void display() {
   //  Start white coloring
   glColor3f(1, 1, 1);
   glDisable(GL_LIGHTING); // Disable lighting for HUD and axes
-  if (axes)
-    drawAxes(5.0); // Draw axes
-  drawHUD(); // Draw HUD (handles its own display based on mode)
+  glDisable(GL_FOG);      // Disable fog for HUD and crosshair overlays
 
-  // Draw Crosshair in First-Person mode
-  if (mode == 2)
-    drawCrosshair();
+  // Draw "overlay" elements
+  if (axes) drawAxes(5.0); // Draw axes
+  drawHUD(); // Draw HUD (handles its own display based on mode)
+  if (mode == 2) drawCrosshair(); // Draw Crosshair in First-Person mode
 
   //  Present frame
   ErrCheck("display");
@@ -527,6 +579,9 @@ void key(unsigned char ch, int x, int y) {
   //  Manually step time when paused
   else if (ch == '9' && !moveCycle)
     dayNightCycle = fmod(dayNightCycle + 0.01, 1.0);
+  //  Toggle fog
+  else if (ch == 'f' || ch == 'F')
+    fog = 1 - fog;
   //  Toggle projection mode (TAB key)
   else if (ch == 9) {
     mode = (mode == 1) ? 2 : 1; // Toggle between 1 and 2
