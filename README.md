@@ -3,12 +3,21 @@
 **Richard Roberson**
 CSCI5229 Fall 2025
 
-Implements texture mapping on a 3D scene with lighting. Features a textured terrain ground with varied height using sine wave combinations, along with the bullseye targets from previous assignments.
+Implements a 3D archery simulation and environment renderer. Featuring a generated outdoor scene with dynamic lighting, day/night cycles, atmospheric effects, and interactive archery mechanics.
+
+## What remains to be done
+- Sweep test (ray cast) for arrow collision/impact detection. Arrows should get stuck in targets and stop moving. Different areas of the target will yield different scores.
+- Allow 15 shot arrows until the game is over. Keep user high score on disk and display it in the HUD.
+- Add Bear object to the scene with head turning animation
 
 ## Features Implemented
 - **Objects**:
-  - **Ground**: Textured ground terrain with height variations.
-  - **Trees**: Procedurally generated trees with textured trunks and alpha-blended leaves.
+  - **Trees**:
+    - Procedurally generated trees with branching structure.
+    - Textured bark and leaves with alpha blending.
+  - **Terrain**:
+    - Forest ground with height variations and normals using display lists.
+    - Mountain ring surrounding the scene with noise-based height variations and normals.
   - **Bullseyes**: Three textured bullseye targets with animated motion.
   - **Arrow**: Physics-based projectile that can be shot from the camera position.
   - **Light Sphere**: Smooth light source for the scene, which transitions between sun and moon lighting.
@@ -51,7 +60,14 @@ Implements texture mapping on a 3D scene with lighting. Features a textured terr
   - **Anisotropic Filtering (if available)**: Texture loader enables the maximum supported anisotropy via `GL_EXT_texture_filter_anisotropic` for sharper textures at grazing angles.
   - **Texture Filtering Toggle**: Press `o/O` to switch between optimized filtering (mipmaps + anisotropic filtering when supported) and a basic linear mode for comparison; the HUD reports the current state.
 
-## Run the game
+## Graduate level Features (if unclear)
+- Shooting mechanics with charge-up and physics-based trajectories.
+- Algorithmic tree generation with branching structure and alpha-blended leaves.
+- Noise-based mountain peaks generation with normals.
+- Quality/performance optimizations highlighted above.
+- Sweep test (ray casting) for arrow collision detection. (not yet implemented)
+
+## Run the program
 
 ```
 make        # builds the project
