@@ -32,24 +32,25 @@ typedef struct {
 
 /*
  *  Draw a single tree from a Tree struct
- *  t: pointer to Tree structure
+ *  @param t pointer to Tree structure
+ *  @param leavesOnly whether to draw only leaves (for transparent pass)
  */
 void drawTree(const Tree *t, int leavesOnly);
 
 /*
  *  Draw the scene with a forest of trees around the bullseye scene
- *  anim: animation parameter (e.g., sway angle in degrees)
- *  showNormals: toggle to draw debug normals
- *  barkTexture: OpenGL texture ID for bark
- *  leafTexture: OpenGL texture ID for leaves (0 = draw only trunks/branches)
+ *  @param anim animation parameter (e.g., sway angle in degrees)
+ *  @param showNormals toggle to draw debug normals
+ *  @param barkTexture OpenGL texture ID for bark
+ *  @param leafTexture OpenGL texture ID for leaves (0 = draw only trunks/branches)
  */
 void drawTreeScene(double anim, int showNormals, unsigned int barkTexture,
                    unsigned int leafTexture);
 
 /*
  *  Draw only the leaves for all trees (for transparent pass)
- *  anim: animation parameter (e.g., sway angle in degrees)
- *  leafTexture: OpenGL texture ID for leaves
+ *  @param anim animation parameter (e.g., sway angle in degrees)
+ *  @param leafTexture OpenGL texture ID for leaves
  */
 void drawTreeLeaves(double anim, unsigned int leafTexture);
 

@@ -1,9 +1,9 @@
 //  Willem A. (Vlakkies) Schreuder
 #include "utils.h"
 
-//
-//  Print message to stderr and exit
-//
+/*
+ *  Print message to stderr and exit
+ */
 void Fatal(const char *format, ...) {
   va_list args;
   va_start(args, format);
@@ -12,20 +12,22 @@ void Fatal(const char *format, ...) {
   exit(1);
 }
 
-//
-//  Check for OpenGL errors and print to stderr
-//
+/*
+ *  Check for OpenGL errors and print to stderr
+ */
 void ErrCheck(const char *where) {
   int err = glGetError();
   if (err)
     fprintf(stderr, "ERROR: %s [%s]\n", gluErrorString(err), where);
 }
 
+#define LEN 8192 //  Maximum length of text string
 /*
  *  Convenience routine to output raster text
  *  Use VARARGS to make this more flexible
+ *  @param format format string
+ *  @param ... arguments
  */
-#define LEN 8192 //  Maximum length of text string
 void Print(const char *format, ...) {
   char buf[LEN];
   char *ch = buf;
@@ -35,17 +37,14 @@ void Print(const char *format, ...) {
   vsnprintf(buf, LEN, format, args);
   va_end(args);
   //  Display the characters one at a time at the current raster position
-  while (*ch)
-    glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, *ch++);
+  while (*ch) glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, *ch++);
 }
 
-//
-//  Load texture from BMP file
-//
-
-//
-//  Reverse n bytes
-//
+/*
+ *  Reverse n bytes
+ *  @param x pointer to bytes
+ *  @param n number of bytes
+ */
 static void Reverse(void *x, const int n) {
   char *ch = (char *)x;
   for (int k = 0; k < n / 2; k++) {
@@ -55,9 +54,11 @@ static void Reverse(void *x, const int n) {
   }
 }
 
-//
-//  Load texture from BMP file
-//
+/*
+ *  Load texture from BMP file
+ *  @param file name of file
+ *  @return texture name
+ */
 unsigned int LoadTexBMP(const char *file) {
   //  Open file
   FILE *f = fopen(file, "rb");

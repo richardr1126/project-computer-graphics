@@ -29,16 +29,16 @@ typedef struct {
 
 /*
  *  Draw a single bullseye from a Bullseye struct
- *  b: pointer to Bullseye structure
- *  texture: OpenGL texture ID (0 for no texture)
+ *  @param b pointer to Bullseye structure
+ *  @param texture OpenGL texture ID (0 for no texture)
  */
 void drawBullseye(const Bullseye *b, unsigned int texture);
 
 /*
  *  Draw the scene with multiple bullseye targets
- *  zh: animation angle in degrees for bullseye motion
- *  showNormals: whether to draw normal vectors
- *  texture: OpenGL texture ID for bullseyes
+ *  @param zh animation angle in degrees for bullseye motion
+ *  @param showNormals whether to draw normal vectors
+ *  @param texture OpenGL texture ID for bullseyes
  */
 void drawBullseyeScene(double zh, int showNormals, unsigned int texture);
 

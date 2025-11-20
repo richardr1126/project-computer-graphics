@@ -14,24 +14,27 @@ typedef struct {
 
 /*
  *  Draw an arrow from an Arrow struct
- *  arrow: pointer to Arrow structure
- *  showNormals: 1 to draw normals, 0 otherwise
+ *  @param arrow pointer to Arrow structure
+ *  @param showNormals 1 to draw normals, 0 otherwise
  */
 void drawArrow(const Arrow *arrow, int showNormals);
 
 /*
  *  Update arrow physics
- *  arrow: pointer to Arrow structure
- *  dt: time delta in seconds
+ *  @param arrow pointer to Arrow structure
+ *  @param dt time delta in seconds
  */
 void updateArrow(Arrow *arrow, double dt);
 
 /*
  *  Shoot arrow from position with angle
- *  arrow: pointer to Arrow structure
- *  x, y, z: starting position
- *  th, ph: view angles (degrees)
- *  speed: initial speed
+ *  @param arrow pointer to Arrow structure
+ *  @param x starting position x
+ *  @param y starting position y
+ *  @param z starting position z
+ *  @param th view angle theta (degrees)
+ *  @param ph view angle phi (degrees)
+ *  @param speed initial speed
  */
 void shootArrow(Arrow *arrow, double x, double y, double z, double th,
                 double ph, double speed);

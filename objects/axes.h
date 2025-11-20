@@ -8,7 +8,7 @@
 
 /*
  *  Draw axes
- *  len: the axis length in world coordinates
+ *  @param len axis length in world coordinates
  */
 void drawAxes(double len);
 

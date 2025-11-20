@@ -5,7 +5,10 @@
 #include "tree.h"
 #include "../utils.h"
 
-/* Deterministic pseudo-random based on integer seed */
+/* Deterministic pseudo-random based on integer seed
+ * @param s seed
+ * @return random number in [0,1]
+ */
 static double rand01(unsigned int s) {
   /* xorshift32 */
   unsigned int x = s ? s : 1u;
@@ -16,7 +19,9 @@ static double rand01(unsigned int s) {
   return (x & 0xFFFFFFu) / 16777215.0;
 }
 
-/* Apply cylindrical billboarding: rotate to face camera horizontally only */
+/* 
+ * Apply cylindrical billboarding: rotate to face camera horizontally only
+ */
 static void applyCylindricalBillboard() {
   float modelview[16];
   glGetFloatv(GL_MODELVIEW_MATRIX, modelview);
@@ -32,7 +37,11 @@ static void applyCylindricalBillboard() {
   glLoadMatrixf(modelview);
 }
 
-/* Draw a single leaf cluster as a textured quad */
+/*
+ * Draw a single leaf cluster as a textured quad
+ * @param size leaf size
+ * @param texture leaf texture
+ */
 static void drawLeaf(double size, unsigned int texture) {
   /* Texture is assumed bound/enabled by caller in transparent pass */
   glColor3f(1, 1, 1);
@@ -51,7 +60,16 @@ static void drawLeaf(double size, unsigned int texture) {
   glEnd();
 }
 
-/* Draw a textured tapered frustum (r0 -> r1) along +Y with UV controls */
+/*
+ * Draw a textured tapered frustum (r0 -> r1) along +Y with UV controls
+ * @param r0 inner radius
+ * @param r1 outer radius
+ * @param length length of frustum
+ * @param sides number of sides
+ * @param texture texture ID
+ * @param uOffset which part of the texture to use (0..1)
+ * @param vScale how much of the texture to use (0..1)
+ */
 static void drawFrustum(double r0, double r1, double length, unsigned int sides,
                         unsigned int texture, double uOffset, double vScale) {
   if (sides < 6)

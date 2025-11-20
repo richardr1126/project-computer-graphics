@@ -7,6 +7,10 @@
 
 /*
  *  Set projection matrix (perspective)
+ *  @param mode projection mode
+ *  @param fov field of view
+ *  @param asp aspect ratio
+ *  @param dim distance to near plane
  */
 void Project(int mode, int fov, double asp, double dim) {
   //  Tell OpenGL we want to manipulate the projection matrix
@@ -31,6 +35,13 @@ void Project(int mode, int fov, double asp, double dim) {
 
 /*
  *  Set the current view based on the projection mode and angles
+ *  @param mode projection mode
+ *  @param th azimuthal angle
+ *  @param ph polar angle
+ *  @param dim distance to near plane
+ *  @param px x position
+ *  @param py y position
+ *  @param pz z position
  */
 void setViewMode(int mode, double th, double ph, double dim, double px,
                  double py, double pz) {
@@ -55,6 +66,15 @@ void setViewMode(int mode, double th, double ph, double dim, double px,
 /*
  *  Smooth first-person movement: updates px/pz using WASD state and dt
  *  Normalizes diagonal motion to keep constant speed
+ *  @param th azimuthal angle
+ *  @param kForward forward key state
+ *  @param kBackward backward key state
+ *  @param kLeft left key state
+ *  @param kRight right key state
+ *  @param speed movement speed
+ *  @param dt time step
+ *  @param px x position
+ *  @param pz z position
  */
 void fpUpdateMove(int th, int kForward, int kBackward, int kLeft, int kRight,
                   double speed, double dt, double *px, double *pz) {

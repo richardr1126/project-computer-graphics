@@ -66,11 +66,15 @@ double mouseSensitivity = 0.15; // degrees per pixel (lower for smoother feel)
 double zhTargets = 0;     // Animation angle for bullseye motion (degrees)
 int moveTargets = 1;      // Toggle bullseye motion
 double targetRate = 90.0; // default target motion speed (degrees per second)
+// Trees animation (wind sway)
+double zhTrees = 0; // Animation angle for tree sway (degrees)
+// Arrow state
+Arrow arrow = {0, 5, 0, 1, 0, 0, 0, 0, 0, 1.0, 0}; // Initial static arrow
+double chargeStartTime = 0; // Time when right click started
 //  Lighting
 int light = 1;           // Lighting toggle
 double ylight = 8.0;     // Elevation of the light
 double ldist = 15.0;     // Light distance from origin in XZ plane
-
 //  Day/Night Cycle
 double dayNightCycle = 0.0;   // 0.0-1.0: 0 and 1 are noon, 0.5 is midnight
 double cycleRate = 0.05;      // cycle speed (cycles per second) = 20 second full cycle
@@ -83,14 +87,6 @@ unsigned int mountainTexture = 0; // Mountain ring texture ID
 unsigned int woodTexture = 0;     // Wood texture ID for bullseyes
 unsigned int barkTexture = 0;     // Bark texture ID for trees
 unsigned int leafTexture = 0;     // Leaf texture ID for tree foliage
-
-// Trees animation (wind sway)
-double zhTrees = 0; // Animation angle for tree sway (degrees)
-
-// Arrow state
-Arrow arrow = {0, 5, 0, 1, 0, 0, 0, 0, 0, 1.0, 0}; // Initial static arrow
-double chargeStartTime = 0; // Time when right click started
-
 // FPS tracking
 double fps = 0.0;         // Current frames per second
 int frameCount = 0;       // Frame counter for FPS calculation
@@ -107,19 +103,15 @@ void detectAnisoSupport() {
 
 // Apply the current filtering mode to a texture (optimized vs basic)
 void applyTextureFiltering(unsigned int texture) {
-  if (!texture)
-    return;
+  if (!texture) return;
   glBindTexture(GL_TEXTURE_2D, texture);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
   if (textureOptimizations) {
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
-                    GL_LINEAR_MIPMAP_LINEAR);
-    if (anisoSupported)
-      glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, maxAniso);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    if (anisoSupported) glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, maxAniso);
   } else {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    if (anisoSupported)
-      glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, 1.0f);
+    if (anisoSupported) glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, 1.0f);
   }
 }
 

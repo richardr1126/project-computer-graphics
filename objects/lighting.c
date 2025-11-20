@@ -8,6 +8,8 @@
 
 /*
  *  Vertex on a unit sphere given angles (degrees)
+ *  @param th angle in degrees
+ *  @param ph angle in degrees
  */
 static void SphereVertex(double th, double ph) {
   double x = Sin(th) * Cos(ph);
@@ -21,7 +23,11 @@ static void SphereVertex(double th, double ph) {
 
 /*
  *  Draw a lit sphere using latitude-longitude quads
- *  at (x,y,z) with radius r and angular increment inc degrees
+ *  @param x x position
+ *  @param y y position
+ *  @param z z position
+ *  @param r radius
+ *  @param inc angular increment
  */
 static void drawBall(double x, double y, double z, double r, int inc) {
   if (inc < 1)
@@ -44,7 +50,11 @@ static void drawBall(double x, double y, double z, double r, int inc) {
 
 /*
  *  Draw a small sphere to represent the light (unlit so it appears emissive)
- *  isDay: 1 for sun (day), 0 for moon (night)
+ *  @param x x position
+ *  @param y y position
+ *  @param z z position
+ *  @param r radius
+ *  @param isDay 1 for sun (day), 0 for moon (night)
  */
 void drawLightBall(double x, double y, double z, double r, int isDay) {
   glPushMatrix();
@@ -68,7 +78,7 @@ void drawLightBall(double x, double y, double z, double r, int isDay) {
 
 /*
  *  Draw the sky background with day/night cycle
- *  dayNightCycle: 0.0 to 1.0, where 0.0 and 1.0 are noon, 0.5 is midnight
+ *  @param dayNightCycle 0.0 to 1.0, where 0.0 and 1.0 are noon, 0.5 is midnight
  */
 void drawSky(double dayNightCycle) {
   // Save current state

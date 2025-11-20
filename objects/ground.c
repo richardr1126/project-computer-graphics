@@ -6,7 +6,10 @@
 #include "ground.h"
 #include "../utils.h"
 
-// Smoothstep helper
+/*
+ *  Smoothstep helper
+ *  @param t value in [0,1]
+ */
 static inline double smoothstep01(double t) {
   if (t <= 0.0)
     return 0.0;
@@ -15,11 +18,21 @@ static inline double smoothstep01(double t) {
   return t * t * (3.0 - 2.0 * t);
 }
 
+/*
+ *  Linear interpolation helper
+ *  @param a first value
+ *  @param b second value
+ *  @param t interpolation parameter in [0,1]
+ */
 static inline double lerp(double a, double b, double t) {
   return a + t * (b - a);
 }
 
-// Fast 2D integer hash -> [0,1]
+/*
+ *  Fast 2D integer hash -> [0,1]
+ *  @param x first coordinate
+ *  @param y second coordinate
+ */
 static inline double hash2i(int x, int y) {
   unsigned int h = (unsigned int)(x) * 374761393u +
                    (unsigned int)(y) * 668265263u; // large primes
@@ -28,7 +41,11 @@ static inline double hash2i(int x, int y) {
   return (h & 0xFFFFFFu) / 16777215.0; // 24-bit to [0,1]
 }
 
-// Value noise 2D with smooth interpolation, returns in [-1,1]
+/*
+ *  Value noise 2D with smooth interpolation, returns in [-1,1]
+ *  @param x first coordinate
+ *  @param y second coordinate
+ */
 static double valueNoise2(double x, double y) {
   int ix = (int)floor(x);
   int iy = (int)floor(y);
@@ -49,7 +66,14 @@ static double valueNoise2(double x, double y) {
   return 2.0 * nxy - 1.0; // map to [-1,1]
 }
 
-// Fractal Brownian Motion (fBm)
+/*
+ *  Fractal Brownian Motion (fBm)
+ *  @param x first coordinate
+ *  @param y second coordinate
+ *  @param octaves number of octaves
+ *  @param lacunarity lacunarity factor
+ *  @param gain gain factor
+ */
 static double fbm2(double x, double y, int octaves, double lacunarity,
                    double gain) {
   double sum = 0.0;
@@ -66,7 +90,9 @@ static double fbm2(double x, double y, int octaves, double lacunarity,
 /*
  *  Compute height for terrain at given (x,z) position
  *  Uses combination of sine waves to create varied terrain
- *  steepness: multiplier for terrain height variation (1.0 = default)
+ *  @param x first coordinate
+ *  @param z second coordinate
+ *  @param steepness multiplier for terrain height variation (1.0 = default)
  */
 static double terrainHeight(double x, double z, double steepness) {
   // Combine multiple sine waves for interesting terrain
@@ -78,7 +104,15 @@ static double terrainHeight(double x, double z, double steepness) {
 }
 
 /*
- *  Helper to compute normal from finite difference heights
+ *  Compute normal vector for terrain using finite difference method
+ *  @param hL height at left
+ *  @param hR height at right
+ *  @param hD height at down
+ *  @param hU height at up
+ *  @param delta grid spacing
+ *  @param nx normal x component
+ *  @param ny normal y component
+ *  @param nz normal z component
  */
 static void computeFiniteDiffNormal(double hL, double hR, double hD, double hU,
                                     double delta, double *nx, double *ny,
@@ -113,6 +147,12 @@ static void computeFiniteDiffNormal(double hL, double hR, double hD, double hU,
 /*
  *  Compute normal vector for terrain at position (x,z)
  *  Uses finite differences to approximate the normal
+ *  @param x first coordinate
+ *  @param z second coordinate
+ *  @param steepness multiplier for terrain height variation (1.0 = default)
+ *  @param nx normal x component
+ *  @param ny normal y component
+ *  @param nz normal z component
  */
 static void terrainNormal(double x, double z, double steepness, double *nx,
                           double *ny, double *nz) {
@@ -127,9 +167,13 @@ static void terrainNormal(double x, double z, double steepness, double *nx,
 }
 
 /*
- *  Draw ground terrain with varied height
- *  Optimized: caches a display list for the static mesh to avoid per-frame
- * recomputation
+ *  Draw ground terrain with varied height;
+ *  caches a display list for the static mesh to avoid per-frame recomputation
+ *  @param steepness multiplier for terrain height variation (1.0 = default)
+ *  @param size size of the terrain
+ *  @param groundY y position of the ground
+ *  @param texture OpenGL texture ID for the ground
+ *  @param showNormals whether to draw normal vectors
  */
 void drawGround(double steepness, double size, double groundY,
                 unsigned int texture, int showNormals) {
@@ -297,6 +341,11 @@ void drawGround(double steepness, double size, double groundY,
 /*
  *  Compute bowl-like mountain height between inner and outer radii
  *  Produces low heights at innerR and rises toward outerR with noise
+ *  @param x first coordinate
+ *  @param z second coordinate
+ *  @param innerR inner radius
+ *  @param outerR outer radius
+ *  @param heightScale height scale
  */
 static double mountainHeight(double x, double z, double innerR, double outerR,
                              double heightScale) {
@@ -308,10 +357,8 @@ static double mountainHeight(double x, double z, double innerR, double outerR,
     r = outerR;
 
   double s = (r - innerR) / (outerR - innerR); // 0..1 across the ring
-  if (s < 0.0)
-    s = 0.0;
-  if (s > 1.0)
-    s = 1.0;
+  if (s < 0.0) s = 0.0;
+  if (s > 1.0) s = 1.0;
 
   // Basic shape: rise from inner rim, peak, then fall to outer rim
   // Use a sine wave for the base shape
@@ -324,8 +371,7 @@ static double mountainHeight(double x, double z, double innerR, double outerR,
   double mountain = base * (0.5 + 0.5 * noise);
 
   // Sink near the inner rim to avoid cracks/z-fighting under the forest ground
-  double innerBlend =
-      smoothstep01(s / 0.12); // 0 at rim, 1 after ~12% of the band
+  double innerBlend = smoothstep01(s / 0.12); // 0 at rim, 1 after ~12% of the band
   double worldH = heightScale * mountain;
   worldH -= 0.6 * (1.0 - innerBlend); // sink up to 0.6 world units at the seam
 
@@ -333,7 +379,16 @@ static double mountainHeight(double x, double z, double innerR, double outerR,
 }
 
 /*
- *  Finite-difference normal for mountain surface
+ *  Compute normal vector for mountain surface
+ *  Uses finite difference method
+ *  @param x first coordinate
+ *  @param z second coordinate
+ *  @param innerR inner radius
+ *  @param outerR outer radius
+ *  @param heightScale height scale
+ *  @param nx normal x component
+ *  @param ny normal y component
+ *  @param nz normal z component
  */
 static void mountainNormal(double x, double z, double innerR, double outerR,
                            double heightScale, double *nx, double *ny,
@@ -349,6 +404,12 @@ static void mountainNormal(double x, double z, double innerR, double outerR,
 
 /*
  *  Draw a circular mountain ring (bowl-like) surrounding the ground island
+ *  @param innerR inner radius
+ *  @param outerR outer radius
+ *  @param baseY base y position
+ *  @param texture OpenGL texture ID for the mountain ring
+ *  @param showNormals whether to draw normal vectors
+ *  @param heightScale height scale
  */
 void drawMountainRing(double innerR, double outerR, double baseY,
                       unsigned int texture, int showNormals,

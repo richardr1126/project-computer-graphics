@@ -1,5 +1,5 @@
-# project
-EXE=project
+# final
+EXE=final
 OBJDIR=build
 
 # Main target
@@ -35,7 +35,7 @@ endif
 	g++ -c $(CFLG)  $< -o $(OBJDIR)/$@
 
 #  Link
-project: $(OBJDIR)/main.o $(OBJDIR)/bullseye.o $(OBJDIR)/ground.o $(OBJDIR)/lighting.o $(OBJDIR)/axes.o $(OBJDIR)/tree.o $(OBJDIR)/arrow.o $(OBJDIR)/view.o $(OBJDIR)/utils.o
+final: $(OBJDIR)/main.o $(OBJDIR)/bullseye.o $(OBJDIR)/ground.o $(OBJDIR)/lighting.o $(OBJDIR)/axes.o $(OBJDIR)/tree.o $(OBJDIR)/arrow.o $(OBJDIR)/view.o $(OBJDIR)/utils.o
 	gcc $(CFLG) -o $@ $^  $(LIBS)
 
 # Compile objects directory
