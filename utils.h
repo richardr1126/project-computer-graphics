@@ -42,9 +42,6 @@
 #define Cos(th) cos(3.14159265/180*(th))
 #define Sin(th) sin(3.14159265/180*(th))
 
-// sqrt
-#define Sqrt(x) sqrt(x)
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -60,6 +57,16 @@ void Fatal(const char* format , ...);
 // Utilities
 void ErrCheck(const char* where);
 unsigned int LoadTexBMP(const char* file);
+
+// Math helpers
+double Vec3Length(double x, double y, double z);
+void Vec3Normalize(double* x, double* y, double* z);
+void Vec3Cross(double ax, double ay, double az, double bx, double by, double bz,
+               double* rx, double* ry, double* rz);
+void DirectionFromAngles(double th, double ph,
+                         double* dx, double* dy, double* dz);
+double Rand01(unsigned int seed);
+
 
 #ifdef __cplusplus
 }

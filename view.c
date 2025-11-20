@@ -21,8 +21,8 @@ void Project(int mode, int fov, double asp, double dim) {
     //  Perspective transformation - extend far plane to see entire scene
     gluPerspective(fov, asp, dim / 16, 16 * dim);
   else if (mode == 2) {
-    // First-person: use a much closer near plane to avoid clipping when near
-    // objects Approximated with AI/LLM help
+    // First-person: use a much closer near plane to avoid clipping when near objects
+    // (helped by AI)
     const double near = 0.05;
     const double far = 16 * dim;
     gluPerspective(fov, asp, near, far);
@@ -54,11 +54,9 @@ void setViewMode(int mode, double th, double ph, double dim, double px,
     gluLookAt(Ex, Ey, Ez, 0, 0, 0, 0, Cos(ph), 0);
   } else if (mode == 2) {
     // First-person: look from (px,py,pz) along yaw/pitch defined by th/ph
-    // Match orbit convention so th=0 looks toward -Z; helped with this by
-    // AI/LLM
-    double dirX = Sin(th) * Cos(ph);
-    double dirY = +Sin(ph);
-    double dirZ = -Cos(th) * Cos(ph);
+    // Match orbit convention so th=0 looks toward -Z.
+    double dirX, dirY, dirZ;
+    DirectionFromAngles(th, ph, &dirX, &dirY, &dirZ);
     gluLookAt(px, py, pz, px + dirX, py + dirY, pz + dirZ, 0, 1, 0);
   }
 }

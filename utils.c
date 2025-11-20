@@ -3,6 +3,8 @@
 
 /*
  *  Print message to stderr and exit
+ *  @param format format string
+ *  @param ... arguments
  */
 void Fatal(const char *format, ...) {
   va_list args;
@@ -14,6 +16,7 @@ void Fatal(const char *format, ...) {
 
 /*
  *  Check for OpenGL errors and print to stderr
+ *  @param where location of error
  */
 void ErrCheck(const char *where) {
   int err = glGetError();
@@ -38,6 +41,82 @@ void Print(const char *format, ...) {
   va_end(args);
   //  Display the characters one at a time at the current raster position
   while (*ch) glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, *ch++);
+}
+
+/*
+ *  Length of a 3D vector.
+ *  @param x x component of vector
+ *  @param y y component of vector
+ *  @param z z component of vector
+ */
+double Vec3Length(double x, double y, double z) { return sqrt(x * x + y * y + z * z); }
+
+/*
+ *  Normalize vector in place if it has non-negligible length.
+ *  @param x x component of vector
+ *  @param y y component of vector
+ *  @param z z component of vector
+ */
+void Vec3Normalize(double *x, double *y, double *z) {
+  double len = Vec3Length(*x, *y, *z);
+  if (len > 1e-12) {
+    *x /= len;
+    *y /= len;
+    *z /= len;
+  }
+}
+
+/*
+ *  Cross product: result = a x b.
+ *  @param ax x component of a
+ *  @param ay y component of a
+ *  @param az z component of a
+ *  @param bx x component of b
+ *  @param by y component of b
+ *  @param bz z component of b
+ *  @param rx x component of result
+ *  @param ry y component of result
+ *  @param rz z component of result
+ */
+void Vec3Cross(double ax, double ay, double az, double bx, double by, double bz,
+               double *rx, double *ry, double *rz) {
+  if (rx)
+    *rx = ay * bz - az * by;
+  if (ry)
+    *ry = az * bx - ax * bz;
+  if (rz)
+    *rz = ax * by - ay * bx;
+}
+
+/*
+ *  Convert spherical angles (degrees) to a direction vector pointing in the
+ *  same direction used by the camera/arrow math.
+ *  @param th azimuth angle
+ *  @param ph elevation angle
+ *  @param dx x component of direction vector
+ *  @param dy y component of direction vector
+ *  @param dz z component of direction vector
+ */
+void DirectionFromAngles(double th, double ph,
+                         double *dx, double *dy, double *dz) {
+  if (dx)
+    *dx = Sin(th) * Cos(ph);
+  if (dy)
+    *dy = Sin(ph);
+  if (dz)
+    *dz = -Cos(th) * Cos(ph);
+}
+
+/*
+ *  Fast deterministic random number in [0,1] from integer seed.
+ *  @param seed input seed
+ */
+double Rand01(unsigned int seed) {
+  unsigned int x = seed ? seed : 1u;
+  x ^= x << 13;
+  x ^= x >> 17;
+  x ^= x << 5;
+  return (x & 0xFFFFFFu) / 16777215.0;
 }
 
 /*
