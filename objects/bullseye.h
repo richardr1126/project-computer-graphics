@@ -42,4 +42,21 @@ void drawBullseye(const Bullseye *b, unsigned int texture);
  */
 void drawBullseyeScene(double zh, int showNormals, unsigned int texture);
 
+/*
+ *  Get a bullseye definition by index
+ *  @param index index of the bullseye (0 to N-1)
+ *  @param zh animation angle
+ *  @param b pointer to Bullseye structure to fill
+ *  @return 1 if index is valid, 0 otherwise
+ */
+int getBullseye(int index, double zh, Bullseye *b);
+
+/*
+ *  Check collision between arrow and bullseyes
+ *  @param arrow pointer to Arrow structure (modified if stuck)
+ *  @param zh animation angle
+ *  @return score (0 if no hit)
+ */
+int checkBullseyeCollision(void *arrow, double zh); // void* to avoid circular dependency if arrow.h not included
+
 #endif

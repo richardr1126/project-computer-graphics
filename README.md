@@ -4,15 +4,11 @@
 
 Implements a 3D archery simulation and environment renderer. Featuring a generated outdoor scene with dynamic lighting, day/night cycles, atmospheric effects, and interactive archery mechanics.
 
-## What remains to be done
-- Sweep test (ray cast) for arrow collision/impact detection. Arrows should get stuck in targets and stop moving. Different areas of the target will yield different scores.
-- Allow 15 shot arrows until the game is over. Keep user high score on disk and display it in the HUD.
-
 ## Highlighted Grad-level Features
 - **Normal-mapped rock mountain ring using GLSL shaders (color + normal map, fog-aware, togglable with `B`).**
+- Sweep test (ray casting) for arrow collision detection. With animated sticky arrow behavior.
 - Algorithmic tree generation with branching structure and alpha-blended leaves.
 - Quality/performance optimizations highlighted above.
-- Sweep test (ray casting) for arrow collision detection.
 
 ## All Features Implemented
 - **Objects**:
@@ -39,6 +35,9 @@ Implements a 3D archery simulation and environment renderer. Featuring a generat
 - **Archery Mechanics**:
   - **Shooting**: First-person shooting with charge-up mechanic. Hold right-click to charge power (visualized by dynamic crosshair), release to shoot.
   - **Physics**: Arrows follow physics trajectories with gravity.
+  - **Collision**: Arrows stick to targets using ray-cast detection.
+  - **Scoring**: Points awarded based on accuracy and target difficulty (smaller targets with fewer rings award more points). High score is saved to disk.
+  - **Game Loop**: Limited to 15 arrows per round. Game Over status is displayed in the HUD.
 
 - **View Modes**: Switch between perspective (orbit) and first-person views.
 - **Smooth First-Person Move & Look**: Hold WASD to move, click-drag mouse to look around; motion is frame-rate independent, diagonals normalized, and camera angles use smooth double precision.
@@ -73,8 +72,12 @@ make        # builds the project
 
 ## Zip File Contents
 ```bash
-zip -r final.zip . -x ".git/*"
+zip -r final.zip . -x ".git/*" "highscore.txt" ".gitignore"
 ```
+
+## Estimated Time to Completion
+
+~60 hours
 
 ## Code Reuse and AI
 
@@ -92,7 +95,7 @@ AI was used to help in various areas, which primarily consisted of areas where I
 | TAB    | Toggle view modes: Perspective (orbit) ↔ First-Person |
 | +/-    | Change field of view (perspective modes) |
 | [/ ]   | Zoom in/out (orbit modes only) |
-| 0      | Reset view (camera position/angles, FOV) |
+| 0      | Reset view and restart game (score/arrows) |
 | h/H    | Cycle HUD modes (0=hint only, 1=controls, 2=all) |
 | ESC    | Exit |
 

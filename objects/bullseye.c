@@ -4,6 +4,7 @@
  */
 
 #include "bullseye.h"
+#include "arrow.h"
 #include "../utils.h"
 
 /*
@@ -299,58 +300,179 @@ static void drawBullseyeWithNormals(const Bullseye *b, unsigned int texture, int
 }
 
 /*
+ *  Get a bullseye definition by index
+ *  @param index index of the bullseye (0 to N-1)
+ *  @param zh animation angle
+ *  @param b pointer to Bullseye structure to fill
+ *  @return 1 if index is valid, 0 otherwise
+ */
+int getBullseye(int index, double zh, Bullseye *b) {
+  const double aimX = 0.0;
+  const double aimZ = 30.0;
+  double off = 3.0 * Sin(zh);
+
+  if (index == 0) {
+    b->x = 0.0; b->y = 0.0; b->z = -1.5 + 0.4 * off;
+    b->radius = 2.0; b->rings = 6;
+    b->r = 1.0; b->g = 0.0; b->b = 0.0;
+  } else if (index == 1) {
+    b->x = -8.0 + 0.6 * off; b->y = 5.0; b->z = -4.0 - 0.4 * off;
+    b->radius = 1.25; b->rings = 5;
+    b->r = 0.0; b->g = 0.0; b->b = 1.0;
+  } else if (index == 2) {
+    b->x = 8.0 - 0.6 * off; b->y = 5.0; b->z = -4.0 + 0.4 * off;
+    b->radius = 1.25; b->rings = 4;
+    b->r = 0.0; b->g = 1.0; b->b = 0.0;
+  } else if (index == 3) {
+    b->x = -7.0 + 0.5 * off; b->y = 1.75; b->z = 5.5 + 0.7 * off;
+    b->radius = 1.25; b->rings = 4;
+    b->r = 1.0; b->g = 0.0; b->b = 1.0;
+  } else if (index == 4) {
+    b->x = 7.5 - 0.5 * off; b->y = 2.25; b->z = 6.0 + 0.6 * off;
+    b->radius = 1.25; b->rings = 5;
+    b->r = 0.0; b->g = 1.0; b->b = 1.0;
+  } else {
+    return 0;
+  }
+  
+  orientTowardXZ(b, aimX, aimZ);
+  return 1;
+}
+
+/*
  *  Draw the scene with multiple bullseye targets
  *  @param zh z angle (degrees)
  *  @param showNormals 1 to draw normals, 0 otherwise
  *  @param texture texture ID
  */
 void drawBullseyeScene(double zh, int showNormals, unsigned int texture) {
-  const double aimX = 0.0;
-  const double aimZ = 30.0;
-  double off = 3.0 * Sin(zh);
+  Bullseye b;
+  int i = 0;
+  while (getBullseye(i, zh, &b)) {
+    drawBullseyeWithNormals(&b, texture, showNormals);
+    i++;
+  }
+}
 
-  Bullseye b1 = {
-    .x = 0.0, .y = 0.0, .z = -1.5 + 0.4 * off,
-    .radius = 2.0,
-    .rings = 6,
-    .r = 1.0, .g = 0.0, .b = 0.0
-  };
-  orientTowardXZ(&b1, aimX, aimZ);
-  drawBullseyeWithNormals(&b1, texture, showNormals);
 
-  Bullseye b2 = {
-    .x = -8.0 + 0.6 * off, .y = 5.0, .z = -4.0 - 0.4 * off,
-    .radius = 1.25,
-    .rings = 5,
-    .r = 0.0, .g = 0.0, .b = 1.0
-  };
-  orientTowardXZ(&b2, aimX, aimZ);
-  drawBullseyeWithNormals(&b2, texture, showNormals);
+/*
+ *  Check collision between arrow and bullseyes
+ *  @param arrowPtr pointer to Arrow structure
+ *  @param zh animation angle
+ *  @return score (0 if no hit)
+ */
+int checkBullseyeCollision(void *arrowPtr, double zh) {
+  Arrow *arrow = (Arrow *)arrowPtr;
+  if (!arrow || !arrow->active || arrow->stuck) return 0;
 
-  Bullseye b3 = {
-    .x = 8.0 - 0.6 * off, .y = 5.0, .z = -4.0 + 0.4 * off,
-    .radius = 1.25,
-    .rings = 4,
-    .r = 0.0, .g = 1.0, .b = 0.0
-  };
-  orientTowardXZ(&b3, aimX, aimZ);
-  drawBullseyeWithNormals(&b3, texture, showNormals);
+  // Ray from prev to current (TIP of the arrow)
+  // Arrow length = shaft (3.0) + tip (0.5) = 3.5
+  const double arrowLen = 3.5;
+  
+  // Tip positions
+  double tip1x = arrow->prevX + arrow->dx * arrowLen;
+  double tip1y = arrow->prevY + arrow->dy * arrowLen;
+  double tip1z = arrow->prevZ + arrow->dz * arrowLen;
+  
+  double tip2x = arrow->x + arrow->dx * arrowLen;
+  double tip2y = arrow->y + arrow->dy * arrowLen;
+  double tip2z = arrow->z + arrow->dz * arrowLen;
 
-  Bullseye b4 = {
-    .x = -7.0 + 0.5 * off, .y = 1.75, .z = 5.5 + 0.7 * off,
-    .radius = 1.25,
-    .rings = 4,
-    .r = 1.0, .g = 0.0, .b = 1.0
-  };
-  orientTowardXZ(&b4, aimX, aimZ);
-  drawBullseyeWithNormals(&b4, texture, showNormals);
+  double dirx = tip2x - tip1x, diry = tip2y - tip1y, dirz = tip2z - tip1z;
+  double len = sqrt(dirx*dirx + diry*diry + dirz*dirz);
+  if (len < 1e-6) return 0; // Not moving
 
-  Bullseye b5 = {
-    .x = 7.5 - 0.5 * off, .y = 2.25, .z = 6.0 + 0.6 * off,
-    .radius = 1.25,
-    .rings = 5,
-    .r = 0.0, .g = 1.0, .b = 1.0
-  };
-  orientTowardXZ(&b5, aimX, aimZ);
-  drawBullseyeWithNormals(&b5, texture, showNormals);
+  // Normalize direction
+  double ndx = dirx / len, ndy = diry / len, ndz = dirz / len;
+
+  Bullseye b;
+  int i = 0;
+  while (getBullseye(i, zh, &b)) {
+    // Calculate correct normal vector for the bullseye plane
+    double fx = b.dx, fy = b.dy, fz = b.dz;
+    double ux = b.ux, uy = b.uy, uz = b.uz;
+    double nx, ny, nz; // Normal
+    Vec3Cross(fx, fy, fz, ux, uy, uz, &nx, &ny, &nz);
+    Vec3Normalize(&nx, &ny, &nz);
+
+    // Plane equation: nx*x + ny*y + nz*z + d = 0
+    double d = -(nx * b.x + ny * b.y + nz * b.z);
+
+    // Ray-plane intersection: t = -(N.P1 + d) / (N.D)
+    double denom = nx * ndx + ny * ndy + nz * ndz;
+    
+    // Check if moving towards the face (denom < 0) or generic intersection
+    if (fabs(denom) > 1e-6) {
+      double t = -(nx * tip1x + ny * tip1y + nz * tip1z + d) / denom;
+      if (t >= 0 && t <= len) {
+        // Intersection point (World coords of hit)
+        double ix = tip1x + t * ndx;
+        double iy = tip1y + t * ndy;
+        double iz = tip1z + t * ndz;
+
+        // Check distance from center
+        double dist = sqrt(pow(ix - b.x, 2) + pow(iy - b.y, 2) + pow(iz - b.z, 2));
+        if (dist <= b.radius) {
+          // Hit! Calculate score
+          double ringWidth = b.radius / b.rings;
+          int ringIndex = (int)(dist / ringWidth);
+          if (ringIndex >= b.rings) ringIndex = b.rings - 1;
+
+          // Scoring Logic:
+          // Fewer rings = harder target = more points per ring.
+          // Base multiplier scales inversely with ring count.
+          // Max rings is 6 (from getBullseye).
+          // Multiplier = 6.0 / b.rings
+          double multiplier = 6.0 / b.rings;
+          
+          int score = (int)((b.rings - ringIndex) * 10 * multiplier);
+          if (ringIndex == 0) score += (int)(20 * multiplier); // Scale bonus too
+
+          // STICK THE ARROW
+          arrow->stuck = 1;
+          arrow->stuckTargetIndex = i;
+          arrow->active = 1; // Keep active so it gets drawn, but physics will skip it
+          
+          // Calculate relative position/rotation
+          // We need to transform the intersection point (ix, iy, iz) into the bullseye's local space
+          // Local space basis: X=Forward, Y=Up, Z=Normal
+          // P_local = [X Y Z]^T * (P_world - Origin)
+          
+          double relX = ix - b.x;
+          double relY = iy - b.y;
+          double relZ = iz - b.z;
+          
+          // Project onto basis vectors
+          // Note: This is the relative position of the TIP
+          double tipRelX = relX * fx + relY * fy + relZ * fz;
+          double tipRelY = relX * ux + relY * uy + relZ * uz;
+          double tipRelZ = relX * nx + relY * ny + relZ * nz;
+          
+          // We want to store the relative position of the ARROW ORIGIN (Tail)
+          // Arrow Origin = Tip - Dir * arrowLen
+          // We need Dir in local space too
+          double localDx = arrow->dx * fx + arrow->dy * fy + arrow->dz * fz;
+          double localDy = arrow->dx * ux + arrow->dy * uy + arrow->dz * uz;
+          double localDz = arrow->dx * nx + arrow->dy * ny + arrow->dz * nz;
+          
+          arrow->stuckRelX = tipRelX - localDx * arrowLen;
+          arrow->stuckRelY = tipRelY - localDy * arrowLen;
+          arrow->stuckRelZ = tipRelZ - localDz * arrowLen;
+          
+          arrow->stuckRelDx = localDx;
+          arrow->stuckRelDy = localDy;
+          arrow->stuckRelDz = localDz;
+          
+          // Snap arrow position to intersection point exactly (offset by length)
+          arrow->x = ix - arrow->dx * arrowLen;
+          arrow->y = iy - arrow->dy * arrowLen;
+          arrow->z = iz - arrow->dz * arrowLen;
+
+          return score;
+        }
+      }
+    }
+    i++;
+  }
+  return 0;
 }

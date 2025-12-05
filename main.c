@@ -62,7 +62,9 @@ double targetRate = 90.0; // Default target motion speed (degrees per second)
 // Trees animation (wind sway)
 double zhTrees = 0; // Animation angle for tree sway (degrees)
 // Arrow state
-Arrow arrow = {0, 5, 0, 1, 0, 0, 0, 0, 0, 1.0, 0}; // Initial static arrow
+// Arrow state
+#define MAX_ARROWS 15
+Arrow arrows[MAX_ARROWS]; // Array of arrows
 double chargeStartTime = 0; // Time when right click started
 //  Lighting
 int light = 1;           // Lighting toggle
@@ -88,10 +90,33 @@ unsigned int barkTexture = 0;     // Bark texture ID for trees
 unsigned int leafTexture = 0;     // Leaf texture ID for tree foliage
 unsigned int mountainNormalTexture = 0; // Normal map for mountain ring
 unsigned int mountainShaderProg = 0;    // Shader program for mountain normal mapping
+// Game State
+int score = 0;
+int arrowsLeft = 15;
+int highScore = 0;
+int gameOver = 0;
 // FPS tracking
 double fps = 0.0;         // Current frames per second
 int frameCount = 0;       // Frame counter for FPS calculation
 double lastFPSTime = 0.0; // Last time FPS was calculated
+
+// Load high score from file
+void loadHighScore() {
+  FILE *f = fopen("highscore.txt", "r");
+  if (f) {
+    if (fscanf(f, "%d", &highScore) != 1) highScore = 0;
+    fclose(f);
+  }
+}
+
+// Save high score to file
+void saveHighScore() {
+  FILE *f = fopen("highscore.txt", "w");
+  if (f) {
+    fprintf(f, "%d", highScore);
+    fclose(f);
+  }
+}
 
 // Cache anisotropic filter support once we have a GL context
 void detectAnisoSupport() {
@@ -195,6 +220,30 @@ void drawHUD() {
     Print("Normals: %s | TexOpt: %s | FPS: %.1f",
           showNormals ? "On" : "Off",
           textureOptimizations ? "On" : "Off", fps);
+  }
+
+  // Game Stats (Always visible in top right or center)
+  int w = glutGet(GLUT_WINDOW_WIDTH);
+  int h = glutGet(GLUT_WINDOW_HEIGHT);
+  
+  // Score and Arrows (Top Right)
+  
+  if (gameOver) {
+      glColor3f(1, 0, 0); // Red
+      glWindowPos2i(w - 220, h - 15);
+      Print("GAME OVER - Score: %d", score);
+      glWindowPos2i(w - 220, h - 30);
+      Print("High Score: %d", highScore);
+      glWindowPos2i(w - 220, h - 45);
+      Print("Press '0' to Restart");
+  } else {
+      glColor3f(1, 1, 0); // Yellow
+      glWindowPos2i(w - 150, h - 15);
+      Print("Score: %d", score);
+      glWindowPos2i(w - 150, h - 30);
+      Print("High Score: %d", highScore);
+      glWindowPos2i(w - 150, h - 45);
+      Print("Arrows: %d", arrowsLeft);
   }
 }
 
@@ -433,8 +482,12 @@ void display() {
   glFrontFace(GL_CCW); // Restore default front-face winding
   glDisable(GL_CULL_FACE);
 
-  // Draw Arrow
-  drawArrow(&arrow, showNormals);
+  // Draw Arrows
+  for (int i = 0; i < MAX_ARROWS; i++) {
+    if (arrows[i].active) {
+      drawArrow(&arrows[i], showNormals);
+    }
+  }
 
   // ===== TRANSPARENT PASS: Draw all transparent objects last =====
   glEnable(GL_BLEND);
@@ -519,6 +572,15 @@ void key(unsigned char ch, int x, int y) {
     } else {
       th = -45;
       ph = 45;
+    }
+    
+    // Reset Game State
+    score = 0;
+    arrowsLeft = 15;
+    gameOver = 0;
+    for (int i = 0; i < MAX_ARROWS; i++) {
+      arrows[i].active = 0;
+      arrows[i].stuck = 0;
     }
   }
   //  Movement keys (first-person only): set pressed flags for smooth motion
@@ -697,8 +759,47 @@ void idle() {
   if (moveCycle)
     dayNightCycle = fmod(dayNightCycle + cycleRate * dt, 1.0);
 
-  // Update arrow physics
-  updateArrow(&arrow, dt);
+  // Update arrows
+  for (int i = 0; i < MAX_ARROWS; i++) {
+    if (!arrows[i].active) continue;
+
+    if (arrows[i].stuck) {
+      // Update position based on target
+      updateStuckArrow(&arrows[i], zhTargets);
+    } else {
+      // Physics update
+      updateArrow(&arrows[i], dt);
+      
+      // Check collision
+      int hitScore = checkBullseyeCollision(&arrows[i], zhTargets);
+      if (hitScore > 0) {
+        score += hitScore;
+        // Arrow is now stuck (handled by checkBullseyeCollision)
+        if (score > highScore) {
+          highScore = score;
+          saveHighScore();
+        }
+      } else if (arrows[i].y < -5.0) { // Ground/Miss check
+         arrows[i].active = 0; // Deactivate missed arrows
+      }
+    }
+  }
+
+  // Check Game Over
+  if (arrowsLeft == 0) { 
+     // Count how many are flying.
+     int flying = 0;
+     for(int i=0; i<MAX_ARROWS; i++) {
+       if (arrows[i].active && !arrows[i].stuck) flying++;
+     }
+     if (flying == 0 && !gameOver) {
+        gameOver = 1;
+        if (score > highScore) {
+          highScore = score;
+          saveHighScore();
+        }
+     }
+  }
 
   glutPostRedisplay();
 }
@@ -738,23 +839,34 @@ void mouse(int button, int state, int x, int y) {
 
       if (chargeStartTime > 0.0) {
         // Release to shoot
-        double now = glutGet(GLUT_ELAPSED_TIME) / 1000.0;
-        double duration = now - chargeStartTime;
+        if (!gameOver && arrowsLeft > 0) {
+          double now = glutGet(GLUT_ELAPSED_TIME) / 1000.0;
+          double duration = now - chargeStartTime;
 
-        // Map duration to speed
-        // Min speed 10, Max speed 50
-        // Max charge time 1.0 second
-        double maxChargeTime = 1.0;
-        double minSpeed = 10.0;
-        double maxSpeed = 50.0;
+          // Map duration to speed
+          // Min speed 10, Max speed 50
+          // Max charge time 1.0 second
+          double maxChargeTime = 1.0;
+          double minSpeed = 10.0;
+          double maxSpeed = 50.0;
 
-        if (duration > maxChargeTime)
-          duration = maxChargeTime;
+          if (duration > maxChargeTime)
+            duration = maxChargeTime;
 
-        double speed =
-            minSpeed + (duration / maxChargeTime) * (maxSpeed - minSpeed);
+          double speed =
+              minSpeed + (duration / maxChargeTime) * (maxSpeed - minSpeed);
 
-        shootArrow(&arrow, px, py, pz, th, ph, speed);
+          // Find first inactive arrow slot
+          for (int i = 0; i < MAX_ARROWS; i++) {
+            if (!arrows[i].active) {
+               shootArrow(&arrows[i], px, py, pz, th, ph, speed);
+               arrows[i].stuck = 0; // Ensure not stuck
+               break;
+            }
+          }
+          
+          arrowsLeft--;
+        }
       }
 
       // Reset charge time
@@ -796,6 +908,10 @@ int main(int argc, char *argv[]) {
   glutInitWindowSize(1000, 700);
   //  Create the window
   glutCreateWindow("Final Project: Richard Roberson");
+  
+  // Load high score
+  loadHighScore();
+
 #ifdef USEGLEW
   //  Initialize GLEW
   if (glewInit() != GLEW_OK)

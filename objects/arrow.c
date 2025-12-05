@@ -1,4 +1,5 @@
 #include "arrow.h"
+#include "bullseye.h"
 #include "../utils.h"
 
 /*
@@ -263,6 +264,9 @@ void updateArrow(Arrow *arrow, double dt) {
   arrow->vy -= g * dt;
 
   // Update position
+  arrow->prevX = arrow->x;
+  arrow->prevY = arrow->y;
+  arrow->prevZ = arrow->z;
   arrow->x += arrow->vx * dt;
   arrow->y += arrow->vy * dt;
   arrow->z += arrow->vz * dt;
@@ -295,16 +299,61 @@ void shootArrow(Arrow *arrow, double x, double y, double z, double th,
   if (!arrow) return;
 
   arrow->active = 1;
+  arrow->active = 1;
   arrow->x = x;
   arrow->y = y;
   arrow->z = z;
+  arrow->prevX = x;
+  arrow->prevY = y;
+  arrow->prevZ = z;
   arrow->scale = 1.0;
 
   // Convert view angles to direction vector
   DirectionFromAngles(th, ph, &arrow->dx, &arrow->dy, &arrow->dz);
 
-  // Set velocity
   arrow->vx = arrow->dx * speed;
   arrow->vy = arrow->dy * speed;
   arrow->vz = arrow->dz * speed;
+}
+
+/*
+ *  Update arrow position when stuck to a target
+ *  @param arrow pointer to Arrow structure
+ *  @param zh animation angle of targets
+ */
+void updateStuckArrow(Arrow *arrow, double zh) {
+  if (!arrow || !arrow->stuck) return;
+
+  // Update position based on target
+  Bullseye b;
+  // We need to include bullseye.h for this
+  // Assuming arrow.c includes bullseye.h now
+  if (getBullseye(arrow->stuckTargetIndex, zh, &b)) {
+    // Reconstruct world position from relative
+    // P_world = Origin + P_local * Basis
+    // Basis: X=Forward(dx,dy,dz), Y=Up(ux,uy,uz), Z=Normal(nx,ny,nz)
+    
+    double fx = b.dx, fy = b.dy, fz = b.dz;
+    double ux = b.ux, uy = b.uy, uz = b.uz;
+    double nx, ny, nz;
+    Vec3Cross(fx, fy, fz, ux, uy, uz, &nx, &ny, &nz);
+    Vec3Normalize(&nx, &ny, &nz);
+    
+    double rx = arrow->stuckRelX;
+    double ry = arrow->stuckRelY;
+    double rz = arrow->stuckRelZ;
+    
+    arrow->x = b.x + rx * fx + ry * ux + rz * nx;
+    arrow->y = b.y + rx * fy + ry * uy + rz * ny;
+    arrow->z = b.z + rx * fz + ry * uz + rz * nz;
+    
+    // Update direction too
+    double rdx = arrow->stuckRelDx;
+    double rdy = arrow->stuckRelDy;
+    double rdz = arrow->stuckRelDz;
+    
+    arrow->dx = rdx * fx + rdy * ux + rdz * nx;
+    arrow->dy = rdx * fy + rdy * uy + rdz * ny;
+    arrow->dz = rdx * fz + rdy * uz + rdz * nz;
+  }
 }
