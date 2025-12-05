@@ -76,20 +76,19 @@ int fog = 1;             // Fog toggle (1=enabled, 0=disabled)
 double dayNightCycle = 0.0;   // 0.0-1.0: 0 and 1 are noon, 0.5 is midnight
 double cycleRate = 0.05;      // cycle speed (cycles per second) = 20 second full cycle
 int moveCycle = 1;            // Toggle day/night cycle motion
-//  Debug helpers
-int showNormals = 0; //  Toggle drawing of normal vectors
-int useMountainNormalMap = 1; // Toggle normal-mapped mountains (1=on,0=off)
 //  Textures
 int textureOptimizations = 1; //  Texture filtering mode: 1=optimized, 0=basic
 int anisoSupported = 0;
 float maxAniso = 1.0f;
-unsigned int groundTexture = 0;   // Ground texture ID
-unsigned int mountainTexture = 0; // Mountain ring texture ID
-unsigned int woodTexture = 0;     // Wood texture ID for bullseyes
-unsigned int barkTexture = 0;     // Bark texture ID for trees
-unsigned int leafTexture = 0;     // Leaf texture ID for tree foliage
-unsigned int mountainNormalTexture = 0; // Normal map for mountain ring
-unsigned int mountainShaderProg = 0;    // Shader program for mountain normal mapping
+int useTerrainNormalMap = 1; // Toggle normal-mapped terrain (ground+mountain rock ring)
+unsigned int groundTexture = 0;         // Ground color texture ID
+unsigned int groundNormalTexture = 0;   // Ground normal map texture ID
+unsigned int mountainTexture = 0;       // Mountain rock ring texture ID
+unsigned int mountainNormalTexture = 0; // Normal map for mountain rock ring
+unsigned int woodTexture = 0;           // Wood texture ID for bullseyes
+unsigned int barkTexture = 0;           // Bark texture ID for trees
+unsigned int leafTexture = 0;           // Leaf texture ID for tree foliage
+unsigned int terrainShaderProg = 0;     // Shader program for terrain normal mapping
 // Game State
 int score = 0;
 int arrowsLeft = 15;
@@ -99,6 +98,8 @@ int gameOver = 0;
 double fps = 0.0;         // Current frames per second
 int frameCount = 0;       // Frame counter for FPS calculation
 double lastFPSTime = 0.0; // Last time FPS was calculated
+//  Debug helpers
+int showNormals = 0; //  Toggle drawing of normal vectors
 
 // Load high score from file
 void loadHighScore() {
@@ -190,9 +191,9 @@ void drawHUD() {
   // Special Controls (combined)
   yTop -= 15;
   glWindowPos2i(5, yTop);
-  Print("  Special: N)Normals  O)TexOpt %s  F)Fog  B)Rocks NM %s",
+  Print("  Special: N)Normals  O)TexOpt %s  F)Fog  B)Ground+Rocks NM %s",
         textureOptimizations ? "On" : "Off",
-        (useMountainNormalMap && mountainShaderProg) ? "On" : "Off");
+        (useTerrainNormalMap && terrainShaderProg) ? "On" : "Off");
 
   // Mode 2 only: Show status info (at bottom of screen)
   if (showHUD == 2) {
@@ -449,17 +450,32 @@ void display() {
   // Draw ground terrain (steepness, size, groundY, texture, showNormals)
   const double groundSize = 45.0;
   const double groundY = -3.0;
-  drawGround(0.5, groundSize, groundY, groundTexture, showNormals);
+  if (useTerrainNormalMap && terrainShaderProg &&
+      groundTexture && groundNormalTexture) {
+    glUseProgram(terrainShaderProg);
+    // Keep fogEnabled uniform in sync with global fog toggle
+    GLint fogLoc = glGetUniformLocation(terrainShaderProg, "fogEnabled");
+    if (fogLoc >= 0) glUniform1i(fogLoc, fog ? 1 : 0);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, groundTexture);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, groundNormalTexture);
+    glActiveTexture(GL_TEXTURE0);
+    drawGround(0.5, groundSize, groundY, groundTexture, showNormals);
+    glUseProgram(0);
+  } else {
+    drawGround(0.5, groundSize, groundY, groundTexture, showNormals);
+  }
 
   // Draw vast mountain ring surrounding the ground island (bowl-like)
   // innerR should match ground size for a seamless join
   // Overlap mountain ring slightly with ground to avoid gap
   const double overlap = 5.0; // increase overlap to fully seal
-  if (useMountainNormalMap && mountainShaderProg &&
+  if (useTerrainNormalMap && terrainShaderProg &&
       mountainTexture && mountainNormalTexture) {
-    glUseProgram(mountainShaderProg);
+    glUseProgram(terrainShaderProg);
     // Keep fogEnabled uniform in sync with global fog toggle
-    GLint fogLoc = glGetUniformLocation(mountainShaderProg, "fogEnabled");
+    GLint fogLoc = glGetUniformLocation(terrainShaderProg, "fogEnabled");
     if (fogLoc >= 0) glUniform1i(fogLoc, fog ? 1 : 0);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, mountainTexture);
@@ -468,7 +484,7 @@ void display() {
     glActiveTexture(GL_TEXTURE0);
   }
   drawMountainRing(groundSize - overlap, 200.0, groundY, mountainTexture, 32.0);
-  if (useMountainNormalMap && mountainShaderProg &&
+  if (useTerrainNormalMap && terrainShaderProg &&
       mountainTexture && mountainNormalTexture) {
     glUseProgram(0);
   }
@@ -679,14 +695,16 @@ void key(unsigned char ch, int x, int y) {
   else if (ch == 'o' || ch == 'O') {
     textureOptimizations = 1 - textureOptimizations;
     applyTextureFiltering(groundTexture);
+    applyTextureFiltering(groundNormalTexture);
     applyTextureFiltering(mountainTexture);
+    applyTextureFiltering(mountainNormalTexture);
     applyTextureFiltering(woodTexture);
     applyTextureFiltering(barkTexture);
     applyTextureFiltering(leafTexture);
   }
   //  Toggle normal-mapped mountains (bump-mapped rocks)
   else if (ch == 'b' || ch == 'B') {
-    useMountainNormalMap = 1 - useMountainNormalMap;
+    useTerrainNormalMap = 1 - useTerrainNormalMap;
   }
   //  Update projection
   Project(mode, fov, asp, dim);
@@ -919,8 +937,9 @@ int main(int argc, char *argv[]) {
 #endif
   //  Detect anisotropic filtering support once a GL context exists
   detectAnisoSupport();
-  //  Load ground texture
-  groundTexture = LoadTexBMP("textures/ground.bmp");
+  //  Load ground textures (forest island)
+  groundTexture = LoadTexBMP("textures/ground_color.bmp");
+  groundNormalTexture = LoadTexBMP("textures/ground_normal.bmp");
   //  Load mountain textures (surrounding ring)
   mountainTexture = LoadTexBMP("textures/rock_color.bmp");
   mountainNormalTexture = LoadTexBMP("textures/rock_normal.bmp");
@@ -932,19 +951,20 @@ int main(int argc, char *argv[]) {
   leafTexture = LoadTexBMP("textures/leaf.bmp");
   //  Apply preferred filtering mode to all textures
   applyTextureFiltering(groundTexture);
+  applyTextureFiltering(groundNormalTexture);
   applyTextureFiltering(mountainTexture);
   applyTextureFiltering(mountainNormalTexture);
   applyTextureFiltering(woodTexture);
   applyTextureFiltering(barkTexture);
   applyTextureFiltering(leafTexture);
-  //  Create shader program for normal-mapped mountains
-  mountainShaderProg = CreateShaderProg("mountain_normal.vert",
-                                           "mountain_normal.frag");
+  //  Create shader program for normal-mapped terrain (ground + rock ring)
+  terrainShaderProg = CreateShaderProg("terrain_normal.vert",
+                                       "terrain_normal.frag");
   //  Bind samplers: colorTex -> unit 0, normalTex -> unit 1
-  if (mountainShaderProg) {
-    glUseProgram(mountainShaderProg);
-    GLint locColor = glGetUniformLocation(mountainShaderProg, "colorTex");
-    GLint locNormal = glGetUniformLocation(mountainShaderProg, "normalTex");
+  if (terrainShaderProg) {
+    glUseProgram(terrainShaderProg);
+    GLint locColor = glGetUniformLocation(terrainShaderProg, "colorTex");
+    GLint locNormal = glGetUniformLocation(terrainShaderProg, "normalTex");
     if (locColor >= 0) glUniform1i(locColor, 0);
     if (locNormal >= 0) glUniform1i(locNormal, 1);
     glUseProgram(0);

@@ -5,10 +5,10 @@
 Implements a 3D archery simulation and environment renderer. Featuring a generated outdoor scene with dynamic lighting, day/night cycles, atmospheric effects, and interactive archery mechanics.
 
 ## Highlighted Grad-level Features
-- **Normal-mapped rock mountain ring using GLSL shaders (color + normal map, fog-aware, togglable with `B`).**
+- **Normal-mapped terrain shader (forest ground + mountain rock ring) using GLSL shaders (color + normal maps, fog-aware, togglable with `B`).**
 - Sweep test (ray casting) for arrow collision detection. With animated sticky arrow behavior.
 - Algorithmic tree generation with branching structure and alpha-blended leaves.
-- Quality/performance optimizations highlighted above.
+- Quality/performance optimizations highlighted below.
 
 ## All Features Implemented
 - **Objects**:
@@ -17,8 +17,8 @@ Implements a 3D archery simulation and environment renderer. Featuring a generat
     - Textured bark and leaves with alpha blending.
   - **Terrain**:
     - Forest ground with height variations and normals using display lists.
-    - Mountain ring surrounding the scene with noise-based height variations.
-    - Normal-mapped rock texture on the distant mountain ring (color + normal map in a GLSL shader, togglable at runtime).
+    - Mountain rock ring surrounding the scene with noise-based height variations.
+    - **Normal-mapped terrain shader:** forest ground and mountain rock ring both use color + normal maps with a shared terrain shader, fog-aware and togglable with `B`.
   - **Bullseyes**: Three textured bullseye targets with animated motion.
   - **Arrow**: Physics-based projectile that can be shot from the camera position.
   - **Light Sphere**: Smooth light source for the scene, which transitions between sun and moon lighting.
@@ -52,7 +52,8 @@ Implements a 3D archery simulation and environment renderer. Featuring a generat
 
 - **Terrain & Ground**:
   - **Culling for Terrain**: The ground and mountain meshes have back-face culling enabled, reducing fragment processing on downward-facing triangles.
-  - **Ground Display List + Strips**: The terrain mesh is precomputed once (heights + normals) and cached in an OpenGL display list rendered as row-wise `GL_TRIANGLE_STRIP`s.
+  - **Display List + Strips**: Both the terrain meshes are precomputed once (heights + normals) and cached in an OpenGL display list rendered as row-wise `GL_TRIANGLE_STRIP`s.
+  - **Normal-mapped terrain shader**: The terrain shader combines color and normal maps, applies fog based on distance, and is optimized to minimize calculations in the fragment shader.
 
 - **Rendering & GL State**:
   - **Reduced State Churn**: Leaf texture is bound once for the entire transparent pass; per-leaf `glEnable(GL_TEXTURE_2D)`/`glBindTexture` calls were removed. Per-frustum texture parameter changes were removed from hot loops.
@@ -124,18 +125,22 @@ AI was used to help in various areas, which primarily consisted of areas where I
 | n/N    | Toggle normals debug lines |
 | o/O    | Toggle texture filtering optimizations (mipmaps + anisotropic filtering) |
 | f/F    | Toggle distance fog on/off |
-| b/B    | Toggle normal-mapped rock mountains (GLSL normal map on distant ring) |
+| b/B    | Toggle normal-mapped terrain (forest ground + mountain rock ring) |
 
 ## Texture credits
 
-<p class="attribution">"<a rel="noopener noreferrer" href="https://www.flickr.com/photos/25797459@N06/22325917510">free seamless texture autumn leaves 2</a>" by <a rel="noopener noreferrer" href="https://www.flickr.com/photos/25797459@N06">zaphad1</a> is licensed under <a rel="noopener noreferrer" href="https://creativecommons.org/licenses/by/2.0/?ref=openverse">CC BY 2.0 <img src="https://mirrors.creativecommons.org/presskit/icons/cc.svg" style="height: 1em; margin-right: 0.125em; display: inline;" /><img src="https://mirrors.creativecommons.org/presskit/icons/by.svg" style="height: 1em; margin-right: 0.125em; display: inline;" /></a>.</p>
+- **High Quality Tileable Light Wood Texture 1**  
+  Source: [webtreats on Flickr](https://www.flickr.com/photos/44071822@N08/4727355663)  
+  License: [CC BY 2.0](https://creativecommons.org/licenses/by/2.0/?ref=openverse)
 
-<p class="attribution">"<a rel="noopener noreferrer" href="https://www.flickr.com/photos/44071822@N08/4727355663">High Quality Tileable Light Wood Texture 1</a>" by <a rel="noopener noreferrer" href="https://www.flickr.com/photos/44071822@N08">webtreats</a> is licensed under <a rel="noopener noreferrer" href="https://creativecommons.org/licenses/by/2.0/?ref=openverse">CC BY 2.0 <img src="https://mirrors.creativecommons.org/presskit/icons/cc.svg" style="height: 1em; margin-right: 0.125em; display: inline;" /><img src="https://mirrors.creativecommons.org/presskit/icons/by.svg" style="height: 1em; margin-right: 0.125em; display: inline;" /></a>.</p>
+- **Bark 4**  
+  Source: [zaphad1 on Flickr](https://www.flickr.com/photos/25797459@N06/22030135762)  
+  License: [CC BY 2.0](https://creativecommons.org/licenses/by/2.0/?ref=openverse)
 
-<p class="attribution">"<a rel="noopener noreferrer" href="https://www.flickr.com/photos/93421824@N06/8494824780">Soft Fur</a>" by <a rel="noopener noreferrer" href="https://www.flickr.com/photos/93421824@N06">Filter Forge</a> is licensed under <a rel="noopener noreferrer" href="https://creativecommons.org/licenses/by/2.0/?ref=openverse">CC BY 2.0 <img src="https://mirrors.creativecommons.org/presskit/icons/cc.svg" style="height: 1em; margin-right: 0.125em; display: inline;" /><img src="https://mirrors.creativecommons.org/presskit/icons/by.svg" style="height: 1em; margin-right: 0.125em; display: inline;" /></a>.</p>
+- **Rock 062**  
+  Source: [ambientCG.com](https://ambientcg.com/a/Rock062)  
+  License: [CC0 1.0 Universal](https://creativecommons.org/publicdomain/zero/1.0/)
 
-<p class="attribution">"<a rel="noopener noreferrer" href="https://www.flickr.com/photos/25797459@N06/22030135762">bark 4</a>" by <a rel="noopener noreferrer" href="https://www.flickr.com/photos/25797459@N06">zaphad1</a> is licensed under <a rel="noopener noreferrer" href="https://creativecommons.org/licenses/by/2.0/?ref=openverse">CC BY 2.0 <img src="https://mirrors.creativecommons.org/presskit/icons/cc.svg" style="height: 1em; margin-right: 0.125em; display: inline;" /><img src="https://mirrors.creativecommons.org/presskit/icons/by.svg" style="height: 1em; margin-right: 0.125em; display: inline;" /></a>.</p>
-
-### PBR Textures
-
-Created using Rock 062 from ambientCG.com, licensed under the Creative Commons CC0 1.0 Universal License.
+- **Ground 037**  
+  Source: [ambientCG.com](https://ambientcg.com/a/Ground037)  
+  License: [CC0 1.0 Universal](https://creativecommons.org/publicdomain/zero/1.0/)
