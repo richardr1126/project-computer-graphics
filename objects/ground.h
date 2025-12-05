@@ -23,11 +23,9 @@ void drawGround(double steepness, double size, double groundY,
  *  @param outerR outer radius of the mountains
  *  @param baseY base height offset in Y direction (same as groundY)
  *  @param texture OpenGL texture ID for mountains (e.g., ground2.bmp)
- *  @param showNormals whether to draw normal vectors for debugging
  *  @param heightScale vertical scale of the mountains (higher => taller mountains)
  */
 void drawMountainRing(double innerR, double outerR, double baseY,
-                      unsigned int texture, int showNormals,
-                      double heightScale);
+                      unsigned int texture, double heightScale);
 
 #endif

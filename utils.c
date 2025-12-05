@@ -29,6 +29,7 @@ void ErrCheck(const char *where) {
 /*
  *  Convenience routine to output raster text
  *  Use VARARGS to make this more flexible
+ *  Original author: Willem A. (Vlakkies) Schreuder
  *  @param format format string
  *  @param ... arguments
  */
@@ -247,4 +248,91 @@ unsigned int LoadTexBMP(const char *file) {
   free(image);
   //  Return texture name
   return texture;
+}
+
+/*
+ *  Read text file into a newly allocated buffer.
+ *  Caller must free the returned pointer.
+ *  Original author: Willem A. (Vlakkies) Schreuder
+ */
+static char *ReadText(const char *file) {
+  char *buffer;
+  FILE *f = fopen(file, "rt");
+  if (!f)
+    Fatal("Cannot open text file %s\n", file);
+  fseek(f, 0, SEEK_END);
+  long n = ftell(f);
+  rewind(f);
+  buffer = (char *)malloc(n + 1);
+  if (!buffer)
+    Fatal("Cannot allocate %ld bytes for text file %s\n", n + 1, file);
+  if (fread(buffer, n, 1, f) != 1)
+    Fatal("Cannot read %ld bytes for text file %s\n", n, file);
+  buffer[n] = 0;
+  fclose(f);
+  return buffer;
+}
+
+/*
+ *  Print shader compile log if there are messages.
+ */
+static void PrintShaderLog(GLuint shader, const char *file) {
+  GLint len = 0;
+  glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &len);
+  if (len > 1) {
+    char *log = (char *)malloc(len);
+    if (!log) return;
+    glGetShaderInfoLog(shader, len, NULL, log);
+    fprintf(stderr, "Shader log for %s:\n%s\n", file, log);
+    free(log);
+  }
+}
+
+/*
+ *  Print program link log if there are messages.
+ */
+static void PrintProgramLog(GLuint prog) {
+  GLint len = 0;
+  glGetProgramiv(prog, GL_INFO_LOG_LENGTH, &len);
+  if (len > 1) {
+    char *log = (char *)malloc(len);
+    if (!log) return;
+    glGetProgramInfoLog(prog, len, NULL, log);
+    fprintf(stderr, "Program link log:\n%s\n", log);
+    free(log);
+  }
+}
+
+/*
+ *  Create Shader
+ *  Original author: Willem A. (Vlakkies) Schreuder
+ *  @param type shader type
+ *  @param file name of file
+ */
+static unsigned int CreateShader(GLenum type, const char *file) {
+  GLuint shader = glCreateShader(type);
+  char *source = ReadText(file);
+  glShaderSource(shader, 1, (const char *const *)&source, NULL);
+  free(source);
+  fprintf(stderr, "Compile %s\n", file);
+  glCompileShader(shader);
+  PrintShaderLog(shader, file);
+  return shader;
+}
+
+/*
+ *  Create Shader Program
+ *  Original author: Willem A. (Vlakkies) Schreuder
+ *  @param VertFile vertex shader file
+ *  @param FragFile fragment shader file
+ */
+unsigned int CreateShaderProg(const char *VertFile, const char *FragFile) {
+  GLuint prog = glCreateProgram();
+  GLuint vert = CreateShader(GL_VERTEX_SHADER, VertFile);
+  GLuint frag = CreateShader(GL_FRAGMENT_SHADER, FragFile);
+  glAttachShader(prog, vert);
+  glAttachShader(prog, frag);
+  glLinkProgram(prog);
+  PrintProgramLog(prog);
+  return prog;
 }

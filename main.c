@@ -7,7 +7,6 @@
  *    +/-    Change field of view (perspective modes)
  *    [/]    Zoom in/out (orbit modes only)
  *    0      Reset view (camera position/angles, FOV)
- *    g/G    Toggle axes display
  *    h/H    Cycle HUD modes (0=hint only, 1=controls, 2=all)
  *    ESC    Exit
  *  Camera Controls:
@@ -16,23 +15,21 @@
  *    arrows          Look around (perspective orbit mode)
  *    w/s             Move forward/backward (first-person mode only)
  *    a/d             Strafe left/right (first-person mode only)
- *  Lighting Controls:
+ *  World Cycle Controls (lighting + sky/time):
  *    l/L    Toggle lighting on/off
  *    1/2    Raise/lower light height
  *    3/4    Increase/decrease light distance
- *  Sky/Time Controls (light rotation tied to day/night cycle):
  *    5      Pause/resume day/night cycle and light rotation
  *    6/7    Increase/decrease cycle speed
  *    9      Manual time step forward (when paused)
- *  Other Controls:
+ *  Special Controls:
+ *    n/N    Toggle normals debug lines
  *    o/O    Toggle texture filtering optimizations (mipmaps + anisotropy)
  *    f/F    Toggle distance fog
- *    p/P    Pause/resume bullseye motion
- *    n/N    Toggle normals debug lines
+ *    b/B    Toggle normal-mapped rock mountains
  */
 //  Include custom modules
 #include "objects/arrow.h"
-#include "objects/axes.h"
 #include "objects/bullseye.h"
 #include "objects/ground.h"
 #include "objects/lighting.h"
@@ -44,7 +41,6 @@
 // View parameters
 double th = 0.0;   //  Azimuth of view angle (degrees)
 double ph = 0.0;   //  Elevation of view angle (degrees)
-int axes = 0;      //  Display axes
 int mode = 2;      //  View mode: 1=Perspective (orbit), 2=First-Person
 int fov = 55;      //  Field of view for perspective
 double asp = 1;    //  Aspect ratio
@@ -62,8 +58,7 @@ int lastX = 0, lastY = 0;       // last mouse position
 double mouseSensitivity = 0.15; // degrees per pixel (lower for smoother feel)
 // Bullseye motion
 double zhTargets = 0;     // Animation angle for bullseye motion (degrees)
-int moveTargets = 1;      // Toggle bullseye motion
-double targetRate = 90.0; // default target motion speed (degrees per second)
+double targetRate = 90.0; // Default target motion speed (degrees per second)
 // Trees animation (wind sway)
 double zhTrees = 0; // Animation angle for tree sway (degrees)
 // Arrow state
@@ -81,6 +76,7 @@ double cycleRate = 0.05;      // cycle speed (cycles per second) = 20 second ful
 int moveCycle = 1;            // Toggle day/night cycle motion
 //  Debug helpers
 int showNormals = 0; //  Toggle drawing of normal vectors
+int useMountainNormalMap = 1; // Toggle normal-mapped mountains (1=on,0=off)
 //  Textures
 int textureOptimizations = 1; //  Texture filtering mode: 1=optimized, 0=basic
 int anisoSupported = 0;
@@ -90,6 +86,8 @@ unsigned int mountainTexture = 0; // Mountain ring texture ID
 unsigned int woodTexture = 0;     // Wood texture ID for bullseyes
 unsigned int barkTexture = 0;     // Bark texture ID for trees
 unsigned int leafTexture = 0;     // Leaf texture ID for tree foliage
+unsigned int mountainNormalTexture = 0; // Normal map for mountain ring
+unsigned int mountainShaderProg = 0;    // Shader program for mountain normal mapping
 // FPS tracking
 double fps = 0.0;         // Current frames per second
 int frameCount = 0;       // Frame counter for FPS calculation
@@ -146,10 +144,9 @@ void drawHUD() {
   yTop -= 15;
   glWindowPos2i(5, yTop);
   if (mode == 1)
-    Print("  View: TAB)Modes  +/-)FOV  [/])Zoom  0)Reset  G)Axes  H)HUD  "
-          "ESC)Exit");
+    Print("  View: TAB)Modes  +/-)FOV  [/])Zoom  0)Reset  H)HUD  ESC)Exit");
   else
-    Print("  View: TAB)Modes  +/-)FOV  0)Reset  G)Axes  H)HUD  ESC)Exit");
+    Print("  View: TAB)Modes  +/-)FOV  0)Reset  H)HUD  ESC)Exit");
   // Camera Controls
   yTop -= 15;
   glWindowPos2i(5, yTop);
@@ -157,27 +154,20 @@ void drawHUD() {
     Print("  Camera: L-Click)Look  R-Click)Aim+Shoot  W/S)Move  A/D)Strafe");
   else
     Print("  Camera: Arrows)Look around");
-  // Lighting Controls
-  yTop -= 15;
-  glWindowPos2i(5, yTop);
-  if (light) {
-    Print("  Lighting: L)Toggle  1/2)Height  3/4)Distance");
-  } else {
-    Print("  Lighting: L)Toggle");
-  }
-  // Sky/Time Controls
+  // World Cycle Controls (lighting + sky/time)
   yTop -= 15;
   glWindowPos2i(5, yTop);
   if (moveCycle) {
-    Print("  Sky/Time: 5)Pause  6/7)Speed (%.2fx)", cycleRate / 0.05);
+    Print("  World Cycle: L)Light  1/2)Height  3/4)Dist  5)Pause  6/7)Speed (%.2fx)", cycleRate / 0.05);
   } else {
-    Print("  Sky/Time: 5)Resume  9)Step  6/7)Speed (%.2fx)", cycleRate / 0.05);
+    Print("  World Cycle: L)Light  1/2)Height  3/4)Dist  5)Resume  9)Step  6/7)Speed (%.2fx)", cycleRate / 0.05);
   }
-  // Other Controls (combined)
+  // Special Controls (combined)
   yTop -= 15;
   glWindowPos2i(5, yTop);
-  Print("  Other: O)Tex Optimize %s  F)Fog  P)Pause bullseye  N)Normals",
-        textureOptimizations ? "On" : "Off");
+  Print("  Special: N)Normals  O)TexOpt %s  F)Fog  B)Rocks NM %s",
+        textureOptimizations ? "On" : "Off",
+        (useMountainNormalMap && mountainShaderProg) ? "On" : "Off");
 
   // Mode 2 only: Show status info (at bottom of screen)
   if (showHUD == 2) {
@@ -416,8 +406,23 @@ void display() {
   // innerR should match ground size for a seamless join
   // Overlap mountain ring slightly with ground to avoid gap
   const double overlap = 5.0; // increase overlap to fully seal
-  drawMountainRing(groundSize - overlap, 200.0, groundY, mountainTexture,
-                   showNormals, 32.0);
+  if (useMountainNormalMap && mountainShaderProg &&
+      mountainTexture && mountainNormalTexture) {
+    glUseProgram(mountainShaderProg);
+    // Keep fogEnabled uniform in sync with global fog toggle
+    GLint fogLoc = glGetUniformLocation(mountainShaderProg, "fogEnabled");
+    if (fogLoc >= 0) glUniform1i(fogLoc, fog ? 1 : 0);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, mountainTexture);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, mountainNormalTexture);
+    glActiveTexture(GL_TEXTURE0);
+  }
+  drawMountainRing(groundSize - overlap, 200.0, groundY, mountainTexture, 32.0);
+  if (useMountainNormalMap && mountainShaderProg &&
+      mountainTexture && mountainNormalTexture) {
+    glUseProgram(0);
+  }
 
   glDisable(GL_CULL_FACE);
 
@@ -451,11 +456,10 @@ void display() {
 
   //  Start white coloring
   glColor3f(1, 1, 1);
-  glDisable(GL_LIGHTING); // Disable lighting for HUD and axes
+  glDisable(GL_LIGHTING); // Disable lighting for HUD
   glDisable(GL_FOG);      // Disable fog for HUD and crosshair overlays
 
   // Draw "overlay" elements
-  if (axes) drawAxes(5.0); // Draw axes
   drawHUD(); // Draw HUD (handles its own display based on mode)
   if (mode == 2) drawCrosshair(); // Draw Crosshair in First-Person mode
 
@@ -530,9 +534,6 @@ void key(unsigned char ch, int x, int y) {
       kD = 1;
     return; // no further processing for these keys on key-down
   }
-  //  Toggle axes
-  else if (ch == 'g' || ch == 'G')
-    axes = 1 - axes;
   //  Cycle HUD modes (0=hint, 1=controls, 2=all)
   else if (ch == 'h' || ch == 'H')
     showHUD = (showHUD + 1) % 3;
@@ -555,9 +556,6 @@ void key(unsigned char ch, int x, int y) {
       ldist = 0.5;
   }
 
-  //  Pause/Resume bullseye motion
-  else if (ch == 'p' || ch == 'P')
-    moveTargets = 1 - moveTargets;
   //  Toggle normals debug
   else if (ch == 'n' || ch == 'N')
     showNormals = 1 - showNormals;
@@ -624,6 +622,10 @@ void key(unsigned char ch, int x, int y) {
     applyTextureFiltering(barkTexture);
     applyTextureFiltering(leafTexture);
   }
+  //  Toggle normal-mapped mountains (bump-mapped rocks)
+  else if (ch == 'b' || ch == 'B') {
+    useMountainNormalMap = 1 - useMountainNormalMap;
+  }
   //  Update projection
   Project(mode, fov, asp, dim);
   //  Tell GLUT it is necessary to redisplay the scene
@@ -687,9 +689,8 @@ void idle() {
   }
 
   // Light position is calculated from dayNightCycle in enableLighting()
-  // Bullseyes move only when enabled
-  if (moveTargets)
-    zhTargets = fmod(zhTargets + targetRate * dt, 360.0);
+  // Bullseyes always move at the configured targetRate
+  zhTargets = fmod(zhTargets + targetRate * dt, 360.0);
   // Trees sway continuously (gentle)
   zhTrees = fmod(zhTrees + 25.0 * dt, 360.0);
   // Day/Night cycle advances when enabled
@@ -804,8 +805,9 @@ int main(int argc, char *argv[]) {
   detectAnisoSupport();
   //  Load ground texture
   groundTexture = LoadTexBMP("textures/ground.bmp");
-  //  Load mountain texture (surrounding ring)
-  mountainTexture = LoadTexBMP("textures/ground2.bmp");
+  //  Load mountain textures (surrounding ring)
+  mountainTexture = LoadTexBMP("textures/rock_color.bmp");
+  mountainNormalTexture = LoadTexBMP("textures/rock_normal.bmp");
   //  Load wood texture for bullseyes
   woodTexture = LoadTexBMP("textures/wood.bmp");
   //  Load bark texture for trees
@@ -815,9 +817,22 @@ int main(int argc, char *argv[]) {
   //  Apply preferred filtering mode to all textures
   applyTextureFiltering(groundTexture);
   applyTextureFiltering(mountainTexture);
+  applyTextureFiltering(mountainNormalTexture);
   applyTextureFiltering(woodTexture);
   applyTextureFiltering(barkTexture);
   applyTextureFiltering(leafTexture);
+  //  Create shader program for normal-mapped mountains
+  mountainShaderProg = CreateShaderProg("mountain_normal.vert",
+                                           "mountain_normal.frag");
+  //  Bind samplers: colorTex -> unit 0, normalTex -> unit 1
+  if (mountainShaderProg) {
+    glUseProgram(mountainShaderProg);
+    GLint locColor = glGetUniformLocation(mountainShaderProg, "colorTex");
+    GLint locNormal = glGetUniformLocation(mountainShaderProg, "normalTex");
+    if (locColor >= 0) glUniform1i(locColor, 0);
+    if (locNormal >= 0) glUniform1i(locNormal, 1);
+    glUseProgram(0);
+  }
   //  Tell GLUT to call "display" when the scene should be drawn
   glutDisplayFunc(display);
   //  Tell GLUT to call "idle" when there is nothing else to do (animate)

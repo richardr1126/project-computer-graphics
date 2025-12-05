@@ -22,7 +22,7 @@ void Project(int mode, int fov, double asp, double dim) {
     gluPerspective(fov, asp, dim / 16, 16 * dim);
   else if (mode == 2) {
     // First-person: use a much closer near plane to avoid clipping when near objects
-    // (helped by AI)
+    /* (helped by AI) */
     const double near = 0.05;
     const double far = 16 * dim;
     gluPerspective(fov, asp, near, far);

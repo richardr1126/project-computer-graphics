@@ -57,6 +57,7 @@ void Fatal(const char* format , ...);
 // Utilities
 void ErrCheck(const char* where);
 unsigned int LoadTexBMP(const char* file);
+unsigned int CreateShaderProg(const char* vertFile, const char* fragFile);
 
 // Math helpers
 double Vec3Length(double x, double y, double z);
