@@ -12,10 +12,9 @@
  *  @param size ground extends from -size to +size in X and Z
  *  @param groundY base height offset in Y direction
  *  @param texture OpenGL texture ID (0 for no texture)
- *  @param showNormals whether to draw normal vectors
  */
 void drawGround(double steepness, double size, double groundY,
-                unsigned int texture, int showNormals);
+                unsigned int texture);
 
 /*
  *  Draw a circular mountain ring (bowl-like) surrounding the ground island

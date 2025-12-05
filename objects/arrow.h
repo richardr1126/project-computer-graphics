@@ -21,9 +21,8 @@ typedef struct {
 /*
  *  Draw an arrow from an Arrow struct
  *  @param arrow pointer to Arrow structure
- *  @param showNormals 1 to draw normals, 0 otherwise
  */
-void drawArrow(const Arrow *arrow, int showNormals);
+void drawArrow(const Arrow *arrow);
 
 /*
  *  Update arrow physics

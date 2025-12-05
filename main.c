@@ -23,7 +23,6 @@
  *    6/7    Increase/decrease cycle speed
  *    9      Manual time step forward (when paused)
  *  Special Controls:
- *    n/N    Toggle normals debug lines
  *    o/O    Toggle texture filtering optimizations (mipmaps + anisotropy)
  *    f/F    Toggle distance fog
  *    b/B    Toggle normal-mapped rock mountains
@@ -99,7 +98,6 @@ double fps = 0.0;         // Current frames per second
 int frameCount = 0;       // Frame counter for FPS calculation
 double lastFPSTime = 0.0; // Last time FPS was calculated
 //  Debug helpers
-int showNormals = 0; //  Toggle drawing of normal vectors
 
 // Load high score from file
 void loadHighScore() {
@@ -191,7 +189,7 @@ void drawHUD() {
   // Special Controls (combined)
   yTop -= 15;
   glWindowPos2i(5, yTop);
-  Print("  Special: N)Normals  O)TexOpt %s  F)Fog  B)Ground+Rocks NM %s",
+  Print("  Special: O)TexOpt %s  F)Fog  B)Ground+Rocks NM %s",
         textureOptimizations ? "On" : "Off",
         (useTerrainNormalMap && terrainShaderProg) ? "On" : "Off");
 
@@ -218,8 +216,7 @@ void drawHUD() {
     // Debug status line
     yBottom += 15;
     glWindowPos2i(5, yBottom);
-    Print("Normals: %s | TexOpt: %s | FPS: %.1f",
-          showNormals ? "On" : "Off",
+    Print("TexOpt: %s | FPS: %.1f",
           textureOptimizations ? "On" : "Off", fps);
   }
 
@@ -441,13 +438,12 @@ void display() {
   glDisable(GL_BLEND);
 
   // Draw bullseyes (animated)
-  // showNormals controls whether normal vectors are drawn for debugging
-  drawBullseyeScene(zhTargets, showNormals, woodTexture);
+  drawBullseyeScene(zhTargets, woodTexture);
 
   // Enable back-face culling for terrain to improve performance
   glEnable(GL_CULL_FACE);
 
-  // Draw ground terrain (steepness, size, groundY, texture, showNormals)
+  // Draw ground terrain (steepness, size, groundY, texture)
   const double groundSize = 45.0;
   const double groundY = -3.0;
   if (useTerrainNormalMap && terrainShaderProg &&
@@ -461,10 +457,10 @@ void display() {
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, groundNormalTexture);
     glActiveTexture(GL_TEXTURE0);
-    drawGround(0.5, groundSize, groundY, groundTexture, showNormals);
+    drawGround(0.5, groundSize, groundY, groundTexture);
     glUseProgram(0);
   } else {
-    drawGround(0.5, groundSize, groundY, groundTexture, showNormals);
+    drawGround(0.5, groundSize, groundY, groundTexture);
   }
 
   // Draw vast mountain ring surrounding the ground island (bowl-like)
@@ -494,14 +490,14 @@ void display() {
   // Draw tree trunks and branches (opaque, uses bark texture)
   glEnable(GL_CULL_FACE);
   glFrontFace(GL_CW); // Tree geometry winds clockwise; treat CW as front
-  drawTreeScene(zhTrees, showNormals, barkTexture, 0);
+  drawTreeScene(zhTrees, barkTexture, 0);
   glFrontFace(GL_CCW); // Restore default front-face winding
   glDisable(GL_CULL_FACE);
 
   // Draw Arrows
   for (int i = 0; i < MAX_ARROWS; i++) {
     if (arrows[i].active) {
-      drawArrow(&arrows[i], showNormals);
+      drawArrow(&arrows[i]);
     }
   }
 
@@ -634,9 +630,6 @@ void key(unsigned char ch, int x, int y) {
       ldist = 0.5;
   }
 
-  //  Toggle normals debug
-  else if (ch == 'n' || ch == 'N')
-    showNormals = 1 - showNormals;
   //  Pause/resume day/night cycle
   else if (ch == '5')
     moveCycle = 1 - moveCycle;

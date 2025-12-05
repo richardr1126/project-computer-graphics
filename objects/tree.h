@@ -21,7 +21,6 @@ typedef struct {
   unsigned int leafTexture;
   /* animation and rendering */
   double anim;     /* animation parameter (sway angle in degrees) */
-  int showNormals; /* toggle to draw debug normals */
   /* seeding for procedural variation */
   unsigned int seed;
 } Tree;
@@ -40,11 +39,10 @@ void drawTree(const Tree *t, int leavesOnly);
 /*
  *  Draw the scene with a forest of trees around the bullseye scene
  *  @param anim animation parameter (e.g., sway angle in degrees)
- *  @param showNormals toggle to draw debug normals
  *  @param barkTexture OpenGL texture ID for bark
  *  @param leafTexture OpenGL texture ID for leaves (0 = draw only trunks/branches)
  */
-void drawTreeScene(double anim, int showNormals, unsigned int barkTexture,
+void drawTreeScene(double anim, unsigned int barkTexture,
                    unsigned int leafTexture);
 
 /*

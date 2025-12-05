@@ -30,7 +30,6 @@ Implements a 3D archery simulation and environment renderer. Featuring a generat
     - Fog color smoothly follows the day/night cycle (blue-tinted in day, darker at night).
     - Fog is stronger/denser at night, and very subtle during the day so nearby terrain remains clear.
   - **Lighting**: Animated light source with ambient, diffuse, and specular components using smooth shading. Shift between moon-like components and sun-like components based on the time of day.
-    - **Normals Debugging**: Toggle display of normals for all objects.
 
 - **Archery Mechanics**:
   - **Shooting**: First-person shooting with charge-up mechanic. Hold right-click to charge power (visualized by dynamic crosshair), release to shoot.
@@ -122,7 +121,6 @@ AI was used to help in various areas, which primarily consisted of areas where I
 ### Special Controls
 | Key    | Action |
 |--------|--------|
-| n/N    | Toggle normals debug lines |
 | o/O    | Toggle texture filtering optimizations (mipmaps + anisotropic filtering) |
 | f/F    | Toggle distance fog on/off |
 | b/B    | Toggle normal-mapped terrain (forest ground + mountain rock ring) |

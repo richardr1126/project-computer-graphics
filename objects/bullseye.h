@@ -37,10 +37,9 @@ void drawBullseye(const Bullseye *b, unsigned int texture);
 /*
  *  Draw the scene with multiple bullseye targets
  *  @param zh animation angle in degrees for bullseye motion
- *  @param showNormals whether to draw normal vectors
  *  @param texture OpenGL texture ID for bullseyes
  */
-void drawBullseyeScene(double zh, int showNormals, unsigned int texture);
+void drawBullseyeScene(double zh, unsigned int texture);
 
 /*
  *  Get a bullseye definition by index

@@ -176,10 +176,9 @@ static void terrainNormal(double x, double z, double steepness, double *nx,
  *  @param size size of the terrain
  *  @param groundY y position of the ground
  *  @param texture OpenGL texture ID for the ground
- *  @param showNormals whether to draw normal vectors
  */
 void drawGround(double steepness, double size, double groundY,
-                unsigned int texture, int showNormals) {
+                unsigned int texture) {
   const double step = 0.5;            // Grid resolution
   const double texScale = 0.2;        // Texture coordinate scale
   const double radius2 = size * size; // Island radius squared
@@ -292,36 +291,6 @@ void drawGround(double steepness, double size, double groundY,
   // Call the cached list
   if (groundList)
     glCallList(groundList);
-
-  // Draw normals if requested (dynamic, not in the list)
-  if (showNormals) {
-    GLboolean wasLit = glIsEnabled(GL_LIGHTING);
-    if (wasLit)
-      glDisable(GL_LIGHTING);
-
-    glColor3f(1.0f, 1.0f, 0.0f);
-    const double normalLen = 0.3;
-    const double normalStep = 1.0;
-
-    glBegin(GL_LINES);
-    for (double x = -size; x <= size; x += normalStep) {
-      for (double z = -size; z <= size; z += normalStep) {
-        if ((x * x + z * z) > radius2)
-          continue; // Only draw normals inside island
-        double h = terrainHeight(x, z, steepness);
-        double nx, ny, nz;
-        terrainNormal(x, z, steepness, &nx, &ny, &nz);
-
-        glVertex3d(x, groundY + h, z);
-        glVertex3d(x + nx * normalLen, groundY + h + ny * normalLen,
-                   z + nz * normalLen);
-      }
-    }
-    glEnd();
-
-    if (wasLit)
-      glEnable(GL_LIGHTING);
-  }
 }
 
 /*
