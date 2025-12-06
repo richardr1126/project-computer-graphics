@@ -80,7 +80,7 @@ zip -r final.zip . -x ".git/*" "highscore.txt" ".gitignore"
 
 ## Estimated Time to Completion
 
-~60 hours
+~70 hours
 
 ## Code Reuse and AI
 
