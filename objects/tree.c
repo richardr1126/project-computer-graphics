@@ -429,6 +429,8 @@ static void drawTreeAt(double x, double z, double anim,
  */
 void drawTreeScene(double anim, unsigned int barkTexture,
                    unsigned int leafTexture) {
+  /* Set face winding for tree geometry */
+  glFrontFace(GL_CW); // Tree geometry winds clockwise; treat CW as front
   /* Material: slightly less specular for bark */
   float spec[] = {0.05f, 0.05f, 0.05f, 1.0f};
   glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, spec);
@@ -441,6 +443,7 @@ void drawTreeScene(double anim, unsigned int barkTexture,
   float white[] = {1, 1, 1, 1};
   glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, white);
   glMaterialf(GL_FRONT_AND_BACK, GL_SHININESS, 32.0f);
+  glFrontFace(GL_CCW); // Restore default front-face winding
 }
 
 /*

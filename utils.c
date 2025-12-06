@@ -254,6 +254,8 @@ unsigned int LoadTexBMP(const char *file) {
  *  Read text file into a newly allocated buffer.
  *  Caller must free the returned pointer.
  *  Original author: Willem A. (Vlakkies) Schreuder
+ *  @param file name of file
+ *  @return pointer to text buffer
  */
 static char *ReadText(const char *file) {
   char *buffer;
@@ -275,6 +277,9 @@ static char *ReadText(const char *file) {
 
 /*
  *  Print shader compile log if there are messages.
+ *  Original author: Willem A. (Vlakkies) Schreuder
+ *  @param shader shader object
+ *  @param file name of file
  */
 static void PrintShaderLog(GLuint shader, const char *file) {
   GLint len = 0;
@@ -290,6 +295,8 @@ static void PrintShaderLog(GLuint shader, const char *file) {
 
 /*
  *  Print program link log if there are messages.
+ *  Original author: Willem A. (Vlakkies) Schreuder
+ *  @param prog program object
  */
 static void PrintProgramLog(GLuint prog) {
   GLint len = 0;

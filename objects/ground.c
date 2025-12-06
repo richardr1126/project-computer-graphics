@@ -37,6 +37,7 @@ static inline double lerp(double a, double b, double t) {
  *  @param y second coordinate
  */
 static inline double hash2i(int x, int y) {
+  // Mix the two integer coordinates into a pseudo-random 32-bit value
   unsigned int h = (unsigned int)(x) * 374761393u +
                    (unsigned int)(y) * 668265263u; // large primes
   h = (h ^ (h >> 13)) * 1274126177u;
@@ -56,9 +57,11 @@ static double valueNoise2(double x, double y) {
   double fx = x - ix;
   double fy = y - iy;
 
+   // Smooth fractional part with smoothstep for smooth interpolation between grid points
   double u = smoothstep01(fx);
   double v = smoothstep01(fy);
 
+  // Noise values at the four corners of the current integer cell
   double n00 = hash2i(ix + 0, iy + 0);
   double n10 = hash2i(ix + 1, iy + 0);
   double n01 = hash2i(ix + 0, iy + 1);
@@ -85,6 +88,7 @@ static double fbm2(double x, double y, int octaves, double lacunarity,
   double amp = 0.5;
   double freq = 1.0;
   for (int i = 0; i < octaves; ++i) {
+    // Accumulate multiple octaves of value noise at increasing frequency
     sum += amp * valueNoise2(x * freq, y * freq);
     freq *= lacunarity;
     amp *= gain;
@@ -103,8 +107,11 @@ static double terrainHeight(double x, double z, double steepness) {
   // Combine multiple sine waves for interesting terrain
   // Uses sin and cos in radians
   double h = 0.0;
+  // Large, smooth undulations
   h += 0.3 * sin(x * 0.5) * cos(z * 0.5);
+  // Medium-scale variation
   h += 0.2 * sin(x * 0.8 + z * 0.3);
+  // Higher frequency detail
   h += 0.15 * cos(x * 1.2 - z * 0.7);
   return h * steepness;
 }
@@ -127,14 +134,18 @@ static void computeFiniteDiffNormal(double hL, double hR, double hD, double hU,
   double tx = 2.0 * delta;
   double ty = hR - hL;
   double tz = 0.0;
-
+  
+  // Up vector
   double ux = 0.0;
   double uy = hU - hD;
   double uz = 2.0 * delta;
 
+  // Cross product to get normal
   double cx, cy, cz;
   Vec3Cross(ux, uy, uz, tx, ty, tz, &cx, &cy, &cz);
   double len = Vec3Length(cx, cy, cz);
+
+  // Normalize the normal vector
   if (len > 1e-12) {
     Vec3Normalize(&cx, &cy, &cz);
     *nx = cx;
@@ -186,6 +197,7 @@ void drawGround(double steepness, double size, double groundY,
   static GLuint groundList = 0;
 
   if (!groundList) {
+    // Create static display list so the terrain mesh is built only once
     groundList = glGenLists(1);
 
     // Precompute heights and normals at grid vertices
@@ -211,6 +223,7 @@ void drawGround(double steepness, double size, double groundY,
       for (int ix = 0; ix < nx; ++ix) {
         double x = x0 + ix * step;
         int idx = iz * nx + ix;
+        // Sample analytic height and finite-difference normal at this vertex
         H[idx] = terrainHeight(x, z, steepness);
         double nxv, nyv, nzv;
         terrainNormal(x, z, steepness, &nxv, &nyv, &nzv);
@@ -236,7 +249,9 @@ void drawGround(double steepness, double size, double groundY,
       glColor3f(0.3f, 0.5f, 0.2f);
     }
 
-    // Render as triangle strips per row, clipped to a circular island
+    // Render as triangle strips per row, clipped to a circular island.
+    // Each row (constant z) becomes one or more triangle strips;
+    // start/stop strips when entering/exiting the circular mask.
     for (int iz = 0; iz < nz - 1; ++iz) {
       double zA = z0 + iz * step;
       double zB = z0 + (iz + 1) * step;
@@ -246,11 +261,13 @@ void drawGround(double steepness, double size, double groundY,
         int iA = iz * nx + ix;
         int iB = (iz + 1) * nx + ix;
 
+        // Determine if both vertices lie inside the circular island
         int inA = (x * x + zA * zA) <= radius2;
         int inB = (x * x + zB * zB) <= radius2;
 
         if (inA && inB) {
           if (!segmentOpen) {
+            // First time inside in this run: begin a triangle strip
             glBegin(GL_TRIANGLE_STRIP);
             segmentOpen = 1;
           }
@@ -265,12 +282,13 @@ void drawGround(double steepness, double size, double groundY,
             glTexCoord2d(x * texScale, zB * texScale);
           glVertex3d(x, groundY + H[iB], zB);
         } else if (segmentOpen) {
+          // We just left the island; close the current strip segment
           glEnd();
           segmentOpen = 0;
         }
       }
       if (segmentOpen)
-        glEnd();
+        glEnd(); // Close strip if it reaches the end of the row
     }
 
     if (texture)
@@ -289,8 +307,7 @@ void drawGround(double steepness, double size, double groundY,
   }
 
   // Call the cached list
-  if (groundList)
-    glCallList(groundList);
+  if (groundList) glCallList(groundList);
 }
 
 /*
@@ -349,6 +366,7 @@ static void mountainNormal(double x, double z, double innerR, double outerR,
                            double heightScale, double *nx, double *ny,
                            double *nz) {
   const double d = 0.2;
+  // Sample heights around the point in four directions
   double hL = mountainHeight(x - d, z, innerR, outerR, heightScale);
   double hR = mountainHeight(x + d, z, innerR, outerR, heightScale);
   double hD = mountainHeight(x, z - d, innerR, outerR, heightScale);
@@ -379,11 +397,15 @@ void drawMountainRing(double innerR, double outerR, double baseY,
   static GLuint ringList = 0;
 
   if (!ringList) {
+    // Build the mountain ring mesh once and cache it in a display list,
+    // similar to drawGround, but restricted to a radial band [innerR, outerR].
     ringList = glGenLists(1);
 
     // Grid bounds cover the whole outer disk
     int nx = (int)floor((2.0 * outerR) / step) + 1;
     int nz = (int)floor((2.0 * outerR) / step) + 1;
+    // This grid covers a square [-outerR, outerR]^2; it later masks out
+    // everything outside the annulus by checking radius at each vertex.
     double x0 = -outerR;
     double z0 = -outerR;
 
@@ -403,8 +425,9 @@ void drawMountainRing(double innerR, double outerR, double baseY,
       glColor3f(0.35f, 0.35f, 0.35f);
     }
 
-    // Triangle strips per row, but only emit segments within the ring [innerR,
-    // outerR]
+    // Triangle strips per row, but only emit segments within the ring
+    // [innerR, outerR]. Each row may have several disjoint segments where
+    // it intersects the annulus.
     for (int iz = 0; iz < nz - 1; ++iz) {
       double zA = z0 + iz * step;
       double zB = z0 + (iz + 1) * step;
@@ -413,11 +436,13 @@ void drawMountainRing(double innerR, double outerR, double baseY,
         double x = x0 + ix * step;
         double r2A = x * x + zA * zA;
         double r2B = x * x + zB * zB;
+        // Check if both vertices belong to the annulus [innerR, outerR]
         int inA = (r2A >= innerR2) && (r2A <= outerR2);
         int inB = (r2B >= innerR2) && (r2B <= outerR2);
 
         if (inA && inB) {
           if (!open) {
+            // Row just entered the annulus: begin a new strip segment
             glBegin(GL_TRIANGLE_STRIP);
             open = 1;
           }
@@ -436,6 +461,7 @@ void drawMountainRing(double innerR, double outerR, double baseY,
           if (texture) glTexCoord2d(x * texScale, zB * texScale);
           glVertex3d(x, baseY + hB, zB);
         } else if (open) {
+          // Row left the annulus: terminate the current strip
           glEnd();
           open = 0;
         }

@@ -176,9 +176,6 @@ void updateArrow(Arrow *arrow, double dt) {
     arrow->dy = arrow->vy / speed;
     arrow->dz = arrow->vz / speed;
   }
-
-  // Collision 
-  // TODO
 }
 
 /*

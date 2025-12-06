@@ -99,44 +99,68 @@ int frameCount = 0;       // Frame counter for FPS calculation
 double lastFPSTime = 0.0; // Last time FPS was calculated
 //  Debug helpers
 
-// Load high score from file
+/*
+ *  Load high score from file
+ */
 void loadHighScore() {
   FILE *f = fopen("highscore.txt", "r");
   if (f) {
+    // Read a single integer; if it fails, reset highScore to 0
     if (fscanf(f, "%d", &highScore) != 1) highScore = 0;
     fclose(f);
   }
 }
 
-// Save high score to file
+/*
+ *  Save high score to file
+ */
 void saveHighScore() {
+  // Open (or create) the high score file for writing (overwrite mode)
   FILE *f = fopen("highscore.txt", "w");
   if (f) {
+    // Write the current highScore value as an integer
     fprintf(f, "%d", highScore);
     fclose(f);
   }
 }
 
-// Cache anisotropic filter support once we have a GL context
+/*
+ *  Detect if anisotropic filtering is supported by the GPU
+ */
 void detectAnisoSupport() {
+  // Query the list of supported OpenGL extensions as a string
   const char *ext = (const char *)glGetString(GL_EXTENSIONS);
+  // Check that the string is valid and contains the anisotropic filter extension
   if (ext && strstr(ext, "GL_EXT_texture_filter_anisotropic")) {
+    // Mark anisotropic filtering as supported
     anisoSupported = 1;
+    // Query the maximum anisotropy value supported by the GPU
     glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &maxAniso);
   }
 }
 
-// Apply the current filtering mode to a texture (optimized vs basic)
+/*
+ *  Apply texture filtering parameters based on optimization setting
+ *  @param texture Texture ID
+ */
 void applyTextureFiltering(unsigned int texture) {
+  // If no texture ID was provided, return
   if (!texture) return;
+
+  // Bind the texture so subsequent parameters affect it
   glBindTexture(GL_TEXTURE_2D, texture);
+  // Always use linear magnification filtering
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-  if (textureOptimizations) {
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-    if (anisoSupported) glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, maxAniso);
-  } else {
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    if (anisoSupported) glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, 1.0f);
+
+  // Choose the minification filter based on optimization setting
+  GLint minFilter = textureOptimizations ? GL_LINEAR_MIPMAP_LINEAR : GL_LINEAR;
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, minFilter);
+
+  // If anisotropic filtering is supported, select the appropriate level
+  if (anisoSupported) {
+    // Optimized: use maximum supported anisotropy, Basic: clamp to 1.0 (off)
+    float aniso = textureOptimizations ? maxAniso : 1.0f;
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, aniso);
   }
 }
 
@@ -371,6 +395,7 @@ void enableFog() {
   float nightFogTop[3] = {0.05f, 0.05f, 0.15f};
   float nightFogBot[3] = {0.1f, 0.1f, 0.25f};
 
+  // Define average fog colors for day and night
   float dayFog[3] = {
       (dayFogTop[0] + dayFogBot[0]) * 0.5f,
       (dayFogTop[1] + dayFogBot[1]) * 0.5f,
@@ -440,59 +465,52 @@ void display() {
   // Draw bullseyes (animated)
   drawBullseyeScene(zhTargets, woodTexture);
 
-  // Enable back-face culling for terrain to improve performance
+  // Enable back-face culling for terrain and trees, then disable for arrows
   glEnable(GL_CULL_FACE);
 
-  // Draw ground terrain (steepness, size, groundY, texture)
+  // Terrain: ground + surrounding mountain ring
   const double groundSize = 45.0;
   const double groundY = -3.0;
+  const double overlap = 5.0; // amount to sink mountains into the ground
+
   if (useTerrainNormalMap && terrainShaderProg &&
-      groundTexture && groundNormalTexture) {
+      groundTexture && groundNormalTexture &&
+      mountainTexture && mountainNormalTexture) {
+    // Normal-mapped path for both ground and mountains
     glUseProgram(terrainShaderProg);
+
     // Keep fogEnabled uniform in sync with global fog toggle
     GLint fogLoc = glGetUniformLocation(terrainShaderProg, "fogEnabled");
     if (fogLoc >= 0) glUniform1i(fogLoc, fog ? 1 : 0);
+
+    // Ground (color in unit 0, normals in unit 1)
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, groundTexture);
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, groundNormalTexture);
     glActiveTexture(GL_TEXTURE0);
     drawGround(0.5, groundSize, groundY, groundTexture);
-    glUseProgram(0);
-  } else {
-    drawGround(0.5, groundSize, groundY, groundTexture);
-  }
 
-  // Draw vast mountain ring surrounding the ground island (bowl-like)
-  // innerR should match ground size for a seamless join
-  // Overlap mountain ring slightly with ground to avoid gap
-  const double overlap = 5.0; // increase overlap to fully seal
-  if (useTerrainNormalMap && terrainShaderProg &&
-      mountainTexture && mountainNormalTexture) {
-    glUseProgram(terrainShaderProg);
-    // Keep fogEnabled uniform in sync with global fog toggle
-    GLint fogLoc = glGetUniformLocation(terrainShaderProg, "fogEnabled");
-    if (fogLoc >= 0) glUniform1i(fogLoc, fog ? 1 : 0);
+    // Mountain ring
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, mountainTexture);
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, mountainNormalTexture);
     glActiveTexture(GL_TEXTURE0);
-  }
-  drawMountainRing(groundSize - overlap, 200.0, groundY, mountainTexture, 32.0);
-  if (useTerrainNormalMap && terrainShaderProg &&
-      mountainTexture && mountainNormalTexture) {
+    drawMountainRing(groundSize - overlap, 200.0, groundY, mountainTexture, 32.0);
+
+    // Restore fixed-function pipeline
     glUseProgram(0);
+  } else {
+    // Fixed-function fallback (no normal mapping)
+    drawGround(0.5, groundSize, groundY, groundTexture);
+    drawMountainRing(groundSize - overlap, 200.0, groundY, mountainTexture, 32.0);
   }
 
-  glDisable(GL_CULL_FACE);
 
   // Draw tree trunks and branches (opaque, uses bark texture)
-  glEnable(GL_CULL_FACE);
-  glFrontFace(GL_CW); // Tree geometry winds clockwise; treat CW as front
   drawTreeScene(zhTrees, barkTexture, 0);
-  glFrontFace(GL_CCW); // Restore default front-face winding
-  glDisable(GL_CULL_FACE);
+  glDisable(GL_CULL_FACE); // Disable culling for arrows
 
   // Draw Arrows
   for (int i = 0; i < MAX_ARROWS; i++) {

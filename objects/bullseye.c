@@ -85,10 +85,10 @@ static void applyBullseyeTransform(const Bullseye *b) {
   }
 
   double mat[16] = {
-      forwardX, forwardY, forwardZ, 0.0,  // local +X
-      upX,      upY,      upZ,      0.0,  // local +Y
-      rightX,   rightY,   rightZ,   0.0,  // local +Z
-      0.0,      0.0,      0.0,      1.0,
+    forwardX, forwardY, forwardZ, 0.0,  // local +X
+    upX,      upY,      upZ,      0.0,  // local +Y
+    rightX,   rightY,   rightZ,   0.0,  // local +Z
+    0.0,      0.0,      0.0,      1.0,
   };
 
   glMultMatrixd(mat);
@@ -157,8 +157,7 @@ void drawBullseye(const Bullseye *b, unsigned int texture) {
         glVertex3d(ri * c, ri * s, -hz);
       }
       glEnd();
-      // Outer side wall (cylindrical surface at radius ro) - radial outward
-      // normals
+      // Outer side wall (cylindrical surface at radius ro) - radial outward normals
       glBegin(GL_QUAD_STRIP);
       for (int ang = 0; ang <= 360; ang += d) {
         double c = Cos(ang);
@@ -171,8 +170,7 @@ void drawBullseye(const Bullseye *b, unsigned int texture) {
         glVertex3d(ro * c, ro * s, -hz);
       }
       glEnd();
-      // Inner side wall (cylindrical surface at radius ri) - radial inward
-      // normals
+      // Inner side wall (cylindrical surface at radius ri) - radial inward normals
       glBegin(GL_QUAD_STRIP);
       for (int ang = 0; ang <= 360; ang += d) {
         double c = Cos(ang);
@@ -247,22 +245,27 @@ int getBullseye(int index, double zh, Bullseye *b) {
   double off = 3.0 * Sin(zh);
 
   if (index == 0) {
+    // Main center target
     b->x = 0.0; b->y = 0.0; b->z = -1.5 + 0.4 * off;
     b->radius = 2.0; b->rings = 6;
     b->r = 1.0; b->g = 0.0; b->b = 0.0;
   } else if (index == 1) {
+    // Left target
     b->x = -8.0 + 0.6 * off; b->y = 5.0; b->z = -4.0 - 0.4 * off;
     b->radius = 1.25; b->rings = 5;
     b->r = 0.0; b->g = 0.0; b->b = 1.0;
   } else if (index == 2) {
+    // Right target
     b->x = 8.0 - 0.6 * off; b->y = 5.0; b->z = -4.0 + 0.4 * off;
     b->radius = 1.25; b->rings = 4;
     b->r = 0.0; b->g = 1.0; b->b = 0.0;
   } else if (index == 3) {
+    // Back left target
     b->x = -7.0 + 0.5 * off; b->y = 1.75; b->z = 5.5 + 0.7 * off;
     b->radius = 1.25; b->rings = 4;
     b->r = 1.0; b->g = 0.0; b->b = 1.0;
   } else if (index == 4) {
+    // Back right target
     b->x = 7.5 - 0.5 * off; b->y = 2.25; b->z = 6.0 + 0.6 * off;
     b->radius = 1.25; b->rings = 5;
     b->r = 0.0; b->g = 1.0; b->b = 1.0;
@@ -377,14 +380,13 @@ int checkBullseyeCollision(void *arrowPtr, double zh) {
           double relZ = iz - b.z;
           
           // Project onto basis vectors
-          // Note: This is the relative position of the TIP
+          // The relative position of the TIP
           double tipRelX = relX * fx + relY * fy + relZ * fz;
           double tipRelY = relX * ux + relY * uy + relZ * uz;
           double tipRelZ = relX * nx + relY * ny + relZ * nz;
           
-          // We want to store the relative position of the ARROW ORIGIN (Tail)
+          // Store the relative position of the ARROW ORIGIN (Tail)
           // Arrow Origin = Tip - Dir * arrowLen
-          // We need Dir in local space too
           double localDx = arrow->dx * fx + arrow->dy * fy + arrow->dz * fz;
           double localDy = arrow->dx * ux + arrow->dy * uy + arrow->dz * uz;
           double localDz = arrow->dx * nx + arrow->dy * ny + arrow->dz * nz;

@@ -8,6 +8,7 @@
 
 /*
  *  Vertex on a unit sphere given angles (degrees)
+ *  Original Author: Willem A. (Vlakkies) Schreuder
  *  @param th angle in degrees
  *  @param ph angle in degrees
  */
